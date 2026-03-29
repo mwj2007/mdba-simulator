@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDBA Season Simulator</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #222; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ─── Firebase Setup ───
+const firebaseConfig = {
+  apiKey: "AIzaSyBUwsU6Aj6sTP5Eyc-lSMtXluAReB5j-LU",
+  authDomain: "mdba-simulator.firebaseapp.com",
+  databaseURL: "https://mdba-simulator-default-rtdb.firebaseio.com",
+  projectId: "mdba-simulator",
+  storageBucket: "mdba-simulator.firebasestorage.app",
+  messagingSenderId: "625372009483",
+  appId: "1:625372009483:web:b3eaf88e76959b313b230e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const gameRef = db.ref('gameState');
+
+// ─── Embedded Rosters ───
+const EMBEDDED_ROSTERS = {"SEATTLE STINGRAYS":[{"name":"JALEN MILES","pos":"PG","age":27,"ovr":86,"info":"GREAT PASSER, GREAT W/ MOVING BALL, BEST HANDLES IN MDBA!"},{"name":"ISAIAH CARTER","pos":"SG","age":20,"ovr":90,"info":"GOOD SHOOTER AND IQ"},{"name":"BRYCE HARRIS","pos":"SF","age":25,"ovr":80,"info":"SPOT UP SHOOTER"},{"name":"MILES WILLIAMS","pos":"PF","age":20,"ovr":83,"info":"ATHLETIC, QUICK FIRST STEP"},{"name":"JULIAN WRIGHT","pos":"C","age":26,"ovr":80,"info":"GOOD POST MOVES"},{"name":"COLE RIVER","pos":"SF","age":30,"ovr":80,"info":"GOOD AT MIDDYS"}],"MILWAUKEE COMMANDERS":[{"name":"STEVE WRIGHT","pos":"PG","age":25,"ovr":81,"info":"CLEAN LAYUPS"},{"name":"LAMAR WALLACE","pos":"SG","age":25,"ovr":72,"info":"GOOD CORNER 3s"},{"name":"DESMOND KING","pos":"SF","age":21,"ovr":87,"info":"PLAYS LIKE LEBRON"},{"name":"TOBIAS SHAW","pos":"PF","age":30,"ovr":76,"info":"GOOD PASSING"},{"name":"JAXON GAZEL","pos":"C","age":19,"ovr":85,"info":"SLOW & CLEAN 3"},{"name":"DORIAN MCOY","pos":"SF","age":27,"ovr":79,"info":"BEST MIDDY IN LEAGUE"}],"MIAMI KNIGHTS":[{"name":"CAMERON BROOKS","pos":"PG","age":25,"ovr":91,"info":"SHIFTY SHOOTER,NICE PASSING & IQ"},{"name":"ELIJAH HAYES","pos":"SG","age":23,"ovr":78,"info":"CLEAN CORNER 3"},{"name":"DARIUS WASHINGTON","pos":"SF","age":28,"ovr":96,"info":"GREAT DUNKER,CLEAN MIDDY"},{"name":"NIKOLAS D'ANGELLO","pos":"PF","age":22,"ovr":76,"info":"GOOD IN THE POST"},{"name":"DEVIN KNOX","pos":"C","age":26,"ovr":84,"info":"GREAT REBOUNDER"},{"name":"CALEB JOHNSON","pos":"PG","age":19,"ovr":80,"info":"GOOD COURT VISTION AND SHOOTER"}],"BOSTON STARS":[{"name":"ANTHONY TOMAS","pos":"PG","age":23,"ovr":82,"info":"GOOD DUNKER & PASS"},{"name":"TOM STUNN","pos":"SG","age":28,"ovr":72,"info":"good at fades"},{"name":"EZEKIEL DOME","pos":"SF","age":24,"ovr":76,"info":"good at dunks"},{"name":"ROYCE TUCKER","pos":"PF","age":30,"ovr":93,"info":"GOOD POST FADE, INSANE 3-BALL"},{"name":"NICOH POKE","pos":"C","age":26,"ovr":77,"info":"good passing & post"},{"name":"KEVIN WALKER","pos":"PF","age":19,"ovr":79,"info":"GREAT MIDDY"}],"DETROIT ROCKETS":[{"name":"MASON BLUNT","pos":"PG","age":26,"ovr":83,"info":"BEST PASSER IN MDBA"},{"name":"ZION KING","pos":"SG","age":31,"ovr":75,"info":"GOOD PASSING"},{"name":"KELLEN MOORE","pos":"SF","age":29,"ovr":81,"info":"CLEAN 3s"},{"name":"NILES MCGEE","pos":"PF","age":20,"ovr":95,"info":"PLAYS LIKE KD"},{"name":"SAM CHARRIS","pos":"C","age":31,"ovr":82,"info":"NICE POSTING MOVES"},{"name":"TROY BENSON","pos":"C","age":21,"ovr":78,"info":"STRONG REBOUNDER"}],"LAS VEGAS ACES":[{"name":"CURTIS MALONE","pos":"PG","age":21,"ovr":80,"info":"good 3 ball"},{"name":"KADE ELLINGTON","pos":"SG","age":22,"ovr":84,"info":"ELITE SHOOTER"},{"name":"ANDREW PETROVIC","pos":"SF","age":23,"ovr":78,"info":"good middy"},{"name":"MALIK BELLINI","pos":"PF","age":22,"ovr":88,"info":"BEST DUNKER IN LEAGUE"},{"name":"IVAN FOX","pos":"C","age":26,"ovr":81,"info":"PLAYS LIKE JOKIC"},{"name":"METEO CRUZ","pos":"SG","age":23,"ovr":76,"info":"SHOOTS LIKE T-REX BUT STILL GOES IN"}],"KANSAS CITY MONARCHS":[{"name":"TYLER CORE","pos":"PG","age":22,"ovr":79,"info":"GOOD 3s"},{"name":"CALVIN CUNNINGHAM","pos":"SG","age":19,"ovr":90,"info":"GREAT DUNKER, AND FADED,MIDDY SPECIALEST"},{"name":"SAM DUFFE","pos":"SF","age":30,"ovr":71,"info":"CLEAN MIDDYS"},{"name":"JAXON PEIRCE","pos":"PF","age":19,"ovr":86,"info":"PLAYS LIKE WEMBY"},{"name":"DOMINIC WELLS","pos":"C","age":20,"ovr":86,"info":"IMITATES SHAQ"},{"name":"MAX WALKER","pos":"PF","age":19,"ovr":73,"info":"GOOD DUNKS"}],"NEW YORK LAZERS":[{"name":"MILES ROBINSON","pos":"PG","age":19,"ovr":85,"info":"SHOOTER"},{"name":"ANTHONY LEWIS","pos":"SG","age":19,"ovr":87,"info":"Slashing Scorer"},{"name":"LOGAN TUBBS","pos":"SF","age":21,"ovr":76,"info":"SHOOTER"},{"name":"ETHAN BROWN","pos":"PF","age":22,"ovr":77,"info":"GOOD D"},{"name":"XAVIER THOMPSON","pos":"C","age":19,"ovr":88,"info":"Elite Shot Blocker"}]};
+
+const TEAM_COLORS = ['#006D75','#2E4057','#D4213D','#1B4D3E','#C41E3A','#C4975C','#4169E1','#FF6600'];
+const PRIMARY = '#B22234';
+
+// ─── Name Generation ───
+const FIRST_NAMES = ['Jaylen','Marcus','Devonte','Tyrese','Cam','Zaire','Jaden','Keegan','Tre','Darius','Malik','Xavier','Kobe','Isaiah','Devin','Andre','Jamal','Kyrie','Donovan','Bam','Cade','Scottie','Paolo','Victor','Amen','Ausar','Bronny','Shaedon','Keyonte','Gradey','Reed','Dereck','Bilal','Collin','Anfernee','Desmond','Scoot','Brandon','Terrence','Jabari','Tari','Nikola','Luka','Shai','Giannis','Joel','Damian','Kawhi','Trae','Ja','Evan','Keldon','Coby','Immanuel','Deni','Obi','Precious','Ayo','Bones','Herb','Ziaire','Josh','Quentin','Jalen','Caleb','Onyeka','Day Ron','Kofi','Walker','Bol','Kai','Jett','Keon','Sharife','Moses','Alperen','Usman','Franz','Scottie','Chet','Bennedict','Mark','TyTy','Ochai','Talen','Bryce','Jarace','Dereck','Ousmane','Rayan','Sidy','Toumani','Ibou'];
+const LAST_NAMES = ['Johnson','Williams','Brown','Jones','Davis','Thompson','Jackson','Robinson','Harris','Clark','Lewis','Walker','Hall','Allen','Young','King','Wright','Scott','Green','Baker','Adams','Nelson','Carter','Mitchell','Turner','Phillips','Campbell','Parker','Evans','Edwards','Collins','Stewart','Morris','Rogers','Reed','Cook','Morgan','Bell','Murphy','Bailey','Rivera','Cooper','Richardson','Cox','Howard','Ward','Torres','Peterson','Gray','Ramirez','James','Watson','Brooks','Kelly','Sanders','Price','Bennett','Wood','Barnes','Ross','Henderson','Coleman','Jenkins','Perry','Powell','Long','Patterson','Hughes','Flores','Washington','Butler','Simmons','Foster','Bryant','Alexander','Russell','Griffin','Hayes','Myers','Ford','Hamilton','Graham','Sullivan','Wallace','Woods','West','Jordan','Owens','Reynolds','Fisher','Ellis','Harrison','Gibson','Marshall','Gordon','Burns','Warren','Diallo','Coulibaly','Ndiaye','Traore','Mbaye','Okafor','Embiid','Adebayo','Antetokounmpo','Sengun'];
+const SKILLS = {
+  PG: ['Elite court vision','Shifty handles','Pull-up jumper','Lockdown on-ball D','Pick & roll maestro','Flashy passer','Quick first step','Clutch gene','Deep range','Transition leader'],
+  SG: ['Lights-out shooter','Catch & shoot specialist','Shot creator','Two-way wing','Slashing scorer','Off-screen movement','Midrange assassin','Knockdown from corners','Athletic finisher','Microwave scorer'],
+  SF: ['Versatile scorer','Lockdown defender','Point forward','Elite dunker','Switchable wing','Tough shot maker','Transition finisher','Playmaking forward','3-and-D specialist','Physical finisher'],
+  PF: ['Stretch four','Post moves','Rim protector','Glass cleaner','Pick & pop threat','Face-up game','Athletic freak','Two-way big','Power dunker','Lob threat'],
+  C: ['Dominant post game','Elite rim protector','Rebounding machine','Pick & roll finisher','Passing big man','Stretch five','Paint beast','Shot-blocking anchor','Physical force','Double-double machine']
+};
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randF(min, max) { return Math.random() * (max - min) + min; }
+function gaussRand(mean, std) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + std * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+function pick(arr) { return arr[rand(0, arr.length - 1)]; }
+
+function generatePlayerName() {
+  return pick(FIRST_NAMES).toUpperCase() + ' ' + pick(LAST_NAMES).toUpperCase();
+}
+
+function generateScoutReport(pos, ovr) {
+  const skill1 = pick(SKILLS[pos] || SKILLS.SF);
+  let skill2 = pick(SKILLS[pos] || SKILLS.SF);
+  while (skill2 === skill1) skill2 = pick(SKILLS[pos] || SKILLS.SF);
+  let tier = '';
+  if (ovr >= 85) tier = 'Franchise-caliber talent. ';
+  else if (ovr >= 78) tier = 'Potential starter. ';
+  else if (ovr >= 70) tier = 'Solid role player. ';
+  else tier = 'Developmental prospect. ';
+  return tier + skill1 + ', ' + skill2.toLowerCase();
+}
+
+function generateProspect(rank, totalPicks) {
+  const pos = pick(['PG','SG','SF','PF','C']);
+  const age = rand(19, 22);
+  // Top picks get higher OVR
+  const pctile = 1 - (rank / totalPicks);
+  const baseOvr = Math.round(62 + pctile * 26 + gaussRand(0, 4));
+  const ovr = Math.max(58, Math.min(92, baseOvr));
+  const name = generatePlayerName();
+  const info = generateScoutReport(pos, ovr);
+  return { name, pos, age, ovr, info, draftRank: rank + 1 };
+}
+
+// ─── Aging / Retirement ───
+function ageAndRetire(teams) {
+  const retired = [];
+  teams.forEach(team => {
+    const toRetire = [];
+    team.players.forEach((p, idx) => {
+      p.age += 1;
+      // OVR changes based on age
+      if (p.age <= 25) {
+        p.ovr = Math.min(99, p.ovr + rand(0, 3));
+      } else if (p.age <= 30) {
+        p.ovr = Math.max(50, Math.min(99, p.ovr + rand(-2, 1)));
+      } else if (p.age <= 33) {
+        p.ovr = Math.max(50, p.ovr + rand(-3, 0));
+      } else {
+        p.ovr = Math.max(45, p.ovr + rand(-5, -1));
+      }
+      // Retirement check
+      let retireChance = 0;
+      if (p.age >= 38) retireChance = 1.0;
+      else if (p.age >= 37) retireChance = 0.90;
+      else if (p.age >= 36) retireChance = 0.75;
+      else if (p.age >= 35) retireChance = 0.55;
+      else if (p.age >= 34) retireChance = 0.35;
+      if (Math.random() < retireChance) {
+        toRetire.push(idx);
+        retired.push({ ...p, team: team.name, teamColor: team.color });
+      }
+    });
+    // Remove retired (reverse order to preserve indices)
+    toRetire.sort((a, b) => b - a).forEach(idx => team.players.splice(idx, 1));
+  });
+  return retired;
+}
+
+// ─── Draft Lottery ───
+function draftLottery(teams) {
+  const sorted = [...teams].sort((a, b) => {
+    const wpctA = a.wins / Math.max(a.wins + a.losses, 1);
+    const wpctB = b.wins / Math.max(b.wins + b.losses, 1);
+    return wpctA - wpctB; // worst team first
+  });
+  // Weighted lottery: worst team gets most balls
+  const weights = sorted.map((_, i) => sorted.length - i + rand(0, 3));
+  const totalWeight = weights.reduce((s, w) => s + w, 0);
+  const order = [];
+  const used = new Set();
+  while (order.length < sorted.length) {
+    let r = Math.random() * totalWeight;
+    for (let i = 0; i < sorted.length; i++) {
+      if (used.has(i)) continue;
+      r -= weights[i];
+      if (r <= 0) {
+        order.push(sorted[i]);
+        used.add(i);
+        break;
+      }
+    }
+    // safety
+    if (order.length < sorted.length) {
+      for (let i = 0; i < sorted.length; i++) {
+        if (!used.has(i) && order.length < sorted.length) {
+          let found = false;
+          for (let j = 0; j < order.length; j++) { if (order[j].name === sorted[i].name) found = true; }
+          if (!found) { /* will be caught next iteration */ }
+        }
+      }
+    }
+  }
+  return order;
+}
+
+function runDraft(teams, numRetirees) {
+  const numPicks = teams.length; // 1 round = 1 pick per team
+  const numProspects = Math.max(numPicks, numRetirees) + 4;
+  const prospects = [];
+  const usedNames = new Set();
+  teams.forEach(t => t.players.forEach(p => usedNames.add(p.name)));
+  for (let i = 0; i < numProspects; i++) {
+    let prospect = generateProspect(i, numProspects);
+    let tries = 0;
+    while (usedNames.has(prospect.name) && tries < 20) {
+      prospect = generateProspect(i, numProspects);
+      tries++;
+    }
+    usedNames.add(prospect.name);
+    prospects.push(prospect);
+  }
+  prospects.sort((a, b) => b.ovr - a.ovr);
+  // assign draft rankings
+  prospects.forEach((p, i) => { p.draftRank = i + 1; });
+
+  const draftOrder = draftLottery(teams);
+  const picks = [];
+  const available = [...prospects];
+
+  draftOrder.forEach((team, pickNum) => {
+    if (available.length === 0) return;
+    // pick best available
+    const chosen = available.shift();
+    const newPlayer = {
+      name: chosen.name,
+      pos: chosen.pos,
+      age: chosen.age,
+      ovr: chosen.ovr,
+      info: chosen.info,
+      stats: { gp:0, pts:0, reb:0, oreb:0, dreb:0, ast:0, stl:0, blk:0, to:0, pf:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, min:0 }
+    };
+    team.players.push(newPlayer);
+    team.players.sort((a, b) => b.ovr - a.ovr);
+    picks.push({ pick: pickNum + 1, team: team.name, teamColor: team.color, player: chosen });
+  });
+
+  return { picks, prospects, undrafted: available };
+}
+
+// ─── Initialize Teams ───
+function initTeams(rosterData) {
+  const teamNames = Object.keys(rosterData);
+  return teamNames.map((name, i) => {
+    const players = rosterData[name]
+      .map(p => ({
+        name: p.name, pos: p.pos.trim(), age: p.age,
+        ovr: p.ovr || Math.round(Math.max(55, Math.min(98, gaussRand(73, 10)))),
+        info: p.info,
+        stats: { gp:0, pts:0, reb:0, oreb:0, dreb:0, ast:0, stl:0, blk:0, to:0, pf:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, min:0 }
+      }))
+      .sort((a, b) => b.ovr - a.ovr);
+    return { name, color: TEAM_COLORS[i % TEAM_COLORS.length], players, wins: 0, losses: 0 };
+  });
+}
+
+// ─── Schedule Generator ───
+function generateSchedule(teams) {
+  const n = teams.length;
+  const gamesPerTeam = 82;
+  const gamePairs = [];
+  const gamesPerPair = Math.floor(gamesPerTeam / (n - 1));
+  const teamGameCounts = new Array(n).fill(0);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      for (let k = 0; k < gamesPerPair; k++) {
+        const homeIdx = k % 2 === 0 ? i : j;
+        const awayIdx = k % 2 === 0 ? j : i;
+        gamePairs.push({ home: homeIdx, away: awayIdx });
+        teamGameCounts[homeIdx]++;
+        teamGameCounts[awayIdx]++;
+      }
+    }
+  }
+  let safety = 0;
+  while (safety < 10000) {
+    let allDone = true;
+    for (let i = 0; i < n; i++) { if (teamGameCounts[i] < gamesPerTeam) { allDone = false; break; } }
+    if (allDone) break;
+    const i = rand(0, n - 1);
+    const j = rand(0, n - 1);
+    if (i === j || teamGameCounts[i] >= gamesPerTeam || teamGameCounts[j] >= gamesPerTeam) { safety++; continue; }
+    gamePairs.push({ home: i, away: j });
+    teamGameCounts[i]++; teamGameCounts[j]++;
+    safety++;
+  }
+  for (let i = gamePairs.length - 1; i > 0; i--) {
+    const j = rand(0, i);
+    [gamePairs[i], gamePairs[j]] = [gamePairs[j], gamePairs[i]];
+  }
+  const schedule = [];
+  const assigned = new Array(gamePairs.length).fill(false);
+  let day = 1, totalAssigned = 0;
+  while (totalAssigned < gamePairs.length) {
+    const busyTeams = new Set();
+    for (let i = 0; i < gamePairs.length; i++) {
+      if (assigned[i]) continue;
+      const g = gamePairs[i];
+      if (busyTeams.has(g.home) || busyTeams.has(g.away)) continue;
+      busyTeams.add(g.home); busyTeams.add(g.away);
+      schedule.push({ ...g, day, result: null });
+      assigned[i] = true; totalAssigned++;
+    }
+    day++;
+  }
+  return schedule;
+}
+
+// ─── Simulation Engine ───
+const POS_BASELINES = {
+  PG: { reb: 3.5, ast: 6.5, blk: 0.2, stl: 1.3 },
+  SG: { reb: 3.8, ast: 3.5, blk: 0.3, stl: 1.1 },
+  SF: { reb: 5.5, ast: 3.0, blk: 0.5, stl: 1.0 },
+  PF: { reb: 7.5, ast: 2.5, blk: 0.8, stl: 0.7 },
+  C:  { reb: 9.5, ast: 2.0, blk: 1.5, stl: 0.6 }
+};
+
+function getMinutes(rosterIdx) {
+  if (rosterIdx < 5) return randF(30, 38);
+  if (rosterIdx < 8) return randF(16, 26);
+  if (rosterIdx < 11) return randF(6, 16);
+  return randF(0, 6);
+}
+
+function simGame(homeTeam, awayTeam) {
+  const homeAvg = homeTeam.players.reduce((s, p) => s + p.ovr, 0) / homeTeam.players.length;
+  const awayAvg = awayTeam.players.reduce((s, p) => s + p.ovr, 0) / awayTeam.players.length;
+  const diff = (homeAvg - awayAvg) * 0.18;
+  const pace = randF(104, 116);
+  const homeAdv = randF(0.5, 3.5);
+  const homeTarget = Math.round(pace + diff + homeAdv + gaussRand(0, 7));
+  const awayTarget = Math.round(pace - diff - homeAdv + gaussRand(0, 7));
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const homeScore = clamp(homeTarget, 92, 135);
+  const awayScore = clamp(awayTarget, 92, 135);
+
+  function simTeamStats(team, targetScore) {
+    const playerStats = [];
+    let totalPts = 0;
+    team.players.forEach((player, idx) => {
+      const base = POS_BASELINES[player.pos] || POS_BASELINES.SF;
+      const minutes = getMinutes(idx);
+      const minScale = minutes / 36;
+      const gameForm = randF(0.65, 1.35);
+
+      // ── Star boost: higher OVR = way more shots ──
+      // OVR 96 gets ~2.2x usage, OVR 72 gets ~0.7x
+      const ovrPower = Math.pow(player.ovr / 78, 2.5);
+      const ratingScale = ovrPower * gameForm;
+
+      // Usage scales heavily with OVR
+      const baseUsage = idx < 5 ? randF(0.10, 0.20) : randF(0.04, 0.12);
+      const usageRate = baseUsage * ratingScale;
+      const fga = Math.round(clamp(usageRate * 85 * minScale, 0, idx < 5 ? 30 : 16));
+      const fgPct = clamp(0.33 + (player.ovr - 60) * 0.005 + gaussRand(0, 0.06), 0.28, 0.62);
+      const fgm = Math.round(fga * fgPct);
+      const tpa = Math.round(fga * randF(0.20, 0.50));
+      const tpPct = clamp(0.26 + (player.ovr - 60) * 0.004 + gaussRand(0, 0.07), 0.20, 0.48);
+      const tpm = Math.round(tpa * tpPct);
+      const fta = Math.round(clamp(fga * randF(0.15, 0.40), 0, 16));
+      const ftPct = clamp(0.58 + (player.ovr - 60) * 0.008 + gaussRand(0, 0.08), 0.50, 0.95);
+      const ftm = Math.round(fta * ftPct);
+      const pts = (fgm - tpm) * 2 + tpm * 3 + ftm;
+
+      // ── Star stat boosts ──
+      // Elite players at their position get amplified signature stats
+      const starMult = player.ovr >= 90 ? 1.8 : player.ovr >= 85 ? 1.4 : player.ovr >= 80 ? 1.1 : 1.0;
+      const reb = Math.round(clamp(base.reb * minScale * randF(0.5, 1.5) * (player.pos === 'C' || player.pos === 'PF' ? starMult : 1.0), 0, 22));
+      const oreb = Math.round(reb * randF(0.12, 0.38));
+      const dreb = reb - oreb;
+      const ast = Math.round(clamp(base.ast * minScale * ratingScale * randF(0.5, 1.5) * (player.pos === 'PG' ? starMult : 1.0), 0, 20));
+      const stl = Math.round(clamp(base.stl * minScale * randF(0.4, 1.8) * starMult, 0, 8));
+      const blk = Math.round(clamp(base.blk * minScale * randF(0.3, 2.0) * (player.pos === 'C' ? starMult * 1.3 : starMult), 0, 10));
+      const to = Math.round(clamp(randF(0.3, 3.5) * minScale, 0, 8));
+      const pf = Math.round(clamp(randF(0.8, 4.5) * minScale, 0, 6));
+
+      totalPts += pts;
+      playerStats.push({ name: player.name, pos: player.pos, ovr: player.ovr, min: Math.round(minutes), pts, reb, oreb, dreb, ast, stl, blk, to, pf, fgm, fga, tpm, tpa, ftm, fta, rosterIdx: idx });
+    });
+
+    if (totalPts > 0 && totalPts !== targetScore) {
+      // distribute normalization weighted by OVR so stars keep their share
+      const totalOvr = playerStats.reduce((s, p) => s + p.ovr, 0);
+      const diff = targetScore - totalPts;
+      let distributed = 0;
+      playerStats.forEach(ps => {
+        const share = Math.round(diff * (ps.ovr / totalOvr));
+        ps.pts += share;
+        distributed += share;
+      });
+      const remain = targetScore - playerStats.reduce((s, p) => s + p.pts, 0);
+      if (remain !== 0) {
+        const top = playerStats.reduce((best, p) => p.ovr > best.ovr ? p : best, playerStats[0]);
+        top.pts += remain;
+      }
+      // ensure no negative pts
+      playerStats.forEach(ps => { if (ps.pts < 0) ps.pts = 0; });
+    }
+    return playerStats;
+  }
+
+  let hStats = simTeamStats(homeTeam, homeScore);
+  let aStats = simTeamStats(awayTeam, awayScore);
+  let hTotal = hStats.reduce((s, p) => s + p.pts, 0);
+  let aTotal = aStats.reduce((s, p) => s + p.pts, 0);
+  if (hTotal === aTotal) { hStats[rand(0, Math.min(4, hStats.length - 1))].pts += 2; hTotal += 2; }
+
+  return { homeScore: hTotal, awayScore: aTotal, homeStats: hStats, awayStats: aStats };
+}
+
+function accumulateStats(team, gameStats) {
+  gameStats.forEach(gs => {
+    const player = team.players.find(p => p.name === gs.name);
+    if (!player) return;
+    const s = player.stats;
+    s.gp++; s.pts += gs.pts; s.reb += gs.reb; s.oreb += gs.oreb; s.dreb += gs.dreb;
+    s.ast += gs.ast; s.stl += gs.stl; s.blk += gs.blk; s.to += gs.to; s.pf += gs.pf;
+    s.fgm += gs.fgm; s.fga += gs.fga; s.tpm += gs.tpm; s.tpa += gs.tpa;
+    s.ftm += gs.ftm; s.fta += gs.fta; s.min += gs.min;
+  });
+}
+
+function avg(val, gp) { return gp > 0 ? (val / gp).toFixed(1) : '0.0'; }
+function pct(made, att) { return att > 0 ? (made / att * 100).toFixed(1) : '0.0'; }
+
+// ─── Awards ───
+function computeAllAwards(st) {
+  const all = [];
+  st.teams.forEach(team => {
+    const wpct = team.wins / Math.max(team.wins + team.losses, 1);
+    team.players.forEach((p, idx) => {
+      if (p.stats.gp < 1) return;
+      all.push({ ...p, teamName: team.name, teamColor: team.color, rosterIdx: idx, wpct });
+    });
+  });
+  const score = (p, fn) => { const gp = p.stats.gp; return fn(p, gp); };
+  const mvp = all.filter(p => p.stats.gp >= 5).map(p => ({ ...p, awardScore: score(p, (p, gp) => p.stats.pts/gp + (p.stats.reb/gp)*0.7 + (p.stats.ast/gp)*0.85 + (p.stats.stl/gp)*1.2 + p.stats.blk/gp + p.wpct*18) })).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+  const dpoy = all.filter(p => p.stats.gp >= 5).map(p => ({ ...p, awardScore: score(p, (p, gp) => (p.stats.stl/gp)*2 + (p.stats.blk/gp)*2.5 + (p.stats.reb/gp)*0.4) })).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+  const smoy = all.filter(p => p.rosterIdx >= 5 && p.stats.gp >= 5).map(p => ({ ...p, awardScore: score(p, (p, gp) => p.stats.pts/gp + (p.stats.reb/gp)*0.5 + (p.stats.ast/gp)*0.7) })).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+  const mip = all.filter(p => p.ovr <= 80 && p.stats.gp >= 5).map(p => ({ ...p, awardScore: score(p, (p, gp) => p.stats.pts/gp - p.ovr*0.2 + (p.stats.reb/gp)*0.3 + (p.stats.ast/gp)*0.3) })).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+  const roy = all.filter(p => p.ovr <= 75 && p.stats.gp >= 5).map(p => ({ ...p, awardScore: score(p, (p, gp) => p.stats.pts/gp + (p.stats.reb/gp)*0.5 + (p.stats.ast/gp)*0.5) })).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+  return { mvp, dpoy, smoy, mip, roy };
+}
+
+function computeLeaders(st) {
+  const all = [];
+  st.teams.forEach(team => { team.players.forEach(p => { if (p.stats.gp >= 1) all.push({ ...p, teamName: team.name, teamColor: team.color }); }); });
+  const topN = (key, n = 20) => [...all].sort((a, b) => (b.stats[key]/b.stats.gp) - (a.stats[key]/a.stats.gp)).slice(0, n);
+  return { pts: topN('pts'), reb: topN('reb'), ast: topN('ast'), stl: topN('stl'), blk: topN('blk') };
+}
+
+// ─── Styles ───
+const S = {
+  container: { maxWidth: 920, margin: '0 auto', padding: '10px 16px' },
+  header: { background: PRIMARY, color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, borderRadius: 8, marginBottom: 16 },
+  headerTitle: { fontSize: 22, fontWeight: 700, letterSpacing: 1 },
+  btn: { background: '#fff', color: PRIMARY, border: 'none', borderRadius: 6, padding: '6px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 14 },
+  btnSm: { background: PRIMARY, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontSize: 12 },
+  tab: (a) => ({ padding: '8px 16px', borderRadius: 6, border: 'none', background: a ? PRIMARY : '#e0e0e0', color: a ? '#fff' : '#333', fontWeight: 600, cursor: 'pointer', fontSize: 13 }),
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+  th: { background: '#333', color: '#fff', padding: '8px 6px', textAlign: 'left', position: 'sticky', top: 0, fontSize: 12, fontWeight: 600 },
+  td: { padding: '6px', borderBottom: '1px solid #e0e0e0' },
+  dot: (c) => ({ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c, marginRight: 6 }),
+  ovr: (o) => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#fff', background: o >= 85 ? PRIMARY : o >= 75 ? '#e88' : '#ccc' }),
+  card: { background: '#fff', borderRadius: 8, padding: 16, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  gold: { background: 'linear-gradient(135deg, #fff8e1, #ffe082)', border: `2px solid ${PRIMARY}`, borderRadius: 8, padding: 12, marginBottom: 12 },
+  medal: (i) => i === 0 ? '\uD83E\uDD47' : i === 1 ? '\uD83E\uDD48' : '\uD83E\uDD49',
+  sync: { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', marginRight: 6 },
+};
+
+// ─── Main App ───
+function App() {
+  const [state, setState] = React.useState(null);
+  const [view, setView] = React.useState('today');
+  const [subView, setSubView] = React.useState(null);
+  const [schedulePage, setSchedulePage] = React.useState(0);
+  const [leaderCat, setLeaderCat] = React.useState('pts');
+  const [expanded, setExpanded] = React.useState(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = React.useState(false);
+  const [connected, setConnected] = React.useState(false);
+  const localWrite = React.useRef(false);
+
+  // ─── Firebase Sync ───
+  React.useEffect(() => {
+    const connRef = db.ref('.info/connected');
+    connRef.on('value', snap => setConnected(!!snap.val()));
+    gameRef.on('value', snap => {
+      if (localWrite.current) { localWrite.current = false; return; }
+      const data = snap.val();
+      if (data) setState(data);
+    });
+    // Check if firebase has data, if not initialize
+    gameRef.once('value', snap => {
+      if (!snap.val()) {
+        const initial = buildInitialState();
+        gameRef.set(initial);
+      }
+    });
+    return () => { gameRef.off(); connRef.off(); };
+  }, []);
+
+  function buildInitialState() {
+    const teams = initTeams(EMBEDDED_ROSTERS);
+    const schedule = generateSchedule(teams);
+    return { teams, schedule, currentDay: 1, done: false, history: [], seasonNum: 1, rosterData: EMBEDDED_ROSTERS, lastDraft: null, lastRetired: null, offseason: false };
+  }
+
+  function syncState(newState) {
+    localWrite.current = true;
+    setState(newState);
+    gameRef.set(newState);
+  }
+
+  function startNewSeason(keepHistory) {
+    const prev = state || {};
+    const teams = initTeams(prev.rosterData || EMBEDDED_ROSTERS);
+    const schedule = generateSchedule(teams);
+    const newState = { teams, schedule, currentDay: 1, done: false, history: prev.history || [], seasonNum: (prev.seasonNum || 1), rosterData: prev.rosterData || EMBEDDED_ROSTERS, lastDraft: null, lastRetired: null, offseason: false };
+    syncState(newState);
+    setView('today'); setSubView(null);
+  }
+
+  function startNextSeason() {
+    // Age players, retire, draft, then new season
+    const prev = JSON.parse(JSON.stringify(state));
+    const retired = ageAndRetire(prev.teams);
+    const draftResult = runDraft(prev.teams, retired.length);
+    // Reset stats for all players
+    prev.teams.forEach(team => {
+      team.wins = 0; team.losses = 0;
+      team.players.forEach(p => {
+        p.stats = { gp:0, pts:0, reb:0, oreb:0, dreb:0, ast:0, stl:0, blk:0, to:0, pf:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, min:0 };
+      });
+    });
+    const schedule = generateSchedule(prev.teams);
+    const newState = {
+      ...prev, schedule, currentDay: 1, done: false,
+      seasonNum: (prev.seasonNum || 1) + 1,
+      lastDraft: draftResult, lastRetired: retired, offseason: false
+    };
+    syncState(newState);
+    setView('draft'); setSubView(null);
+  }
+
+  function simGameAtIndex(gameIdx) {
+    const next = JSON.parse(JSON.stringify(state));
+    const game = next.schedule[gameIdx];
+    if (game.result) return;
+    const homeTeam = next.teams[game.home];
+    const awayTeam = next.teams[game.away];
+    game.result = simGame(homeTeam, awayTeam);
+    if (game.result.homeScore > game.result.awayScore) { homeTeam.wins++; awayTeam.losses++; }
+    else { awayTeam.wins++; homeTeam.losses++; }
+    accumulateStats(homeTeam, game.result.homeStats);
+    accumulateStats(awayTeam, game.result.awayStats);
+    if (next.schedule.every(g => g.result)) { next.done = true; archiveSeason(next); }
+    syncState(next);
+  }
+
+  function simDay() {
+    const next = JSON.parse(JSON.stringify(state));
+    next.schedule.filter(g => g.day === next.currentDay && !g.result).forEach(game => {
+      const h = next.teams[game.home], a = next.teams[game.away];
+      game.result = simGame(h, a);
+      if (game.result.homeScore > game.result.awayScore) { h.wins++; a.losses++; } else { a.wins++; h.losses++; }
+      accumulateStats(h, game.result.homeStats); accumulateStats(a, game.result.awayStats);
+    });
+    if (next.schedule.filter(g => g.day === next.currentDay && !g.result).length === 0) {
+      const maxDay = Math.max(...next.schedule.map(g => g.day));
+      if (next.currentDay < maxDay) next.currentDay++;
+    }
+    if (next.schedule.every(g => g.result)) { next.done = true; archiveSeason(next); }
+    syncState(next);
+  }
+
+  function advanceDay() {
+    const next = JSON.parse(JSON.stringify(state));
+    const maxDay = Math.max(...next.schedule.map(g => g.day));
+    if (next.currentDay < maxDay) next.currentDay++;
+    syncState(next);
+  }
+
+  function simWeek() { for (let i = 0; i < 7; i++) simDay(); }
+
+  function simAll() {
+    const next = JSON.parse(JSON.stringify(state));
+    next.schedule.forEach(game => {
+      if (game.result) return;
+      const h = next.teams[game.home], a = next.teams[game.away];
+      game.result = simGame(h, a);
+      if (game.result.homeScore > game.result.awayScore) { h.wins++; a.losses++; } else { a.wins++; h.losses++; }
+      accumulateStats(h, game.result.homeStats); accumulateStats(a, game.result.awayStats);
+    });
+    next.done = true; next.currentDay = Math.max(...next.schedule.map(g => g.day));
+    archiveSeason(next);
+    syncState(next);
+  }
+
+  function archiveSeason(st) {
+    const standings = [...st.teams].sort((a, b) => (b.wins/(b.wins+b.losses||1)) - (a.wins/(a.wins+a.losses||1)) || b.wins - a.wins);
+    const awards = computeAllAwards(st);
+    const leaders = computeLeaders(st);
+    const champ = standings[0];
+    const mvpW = (awards.mvp || [])[0];
+    if (!st.history) st.history = [];
+    st.history.push({
+      id: Date.now(), date: new Date().toLocaleDateString(), seasonNum: st.seasonNum || st.history.length + 1,
+      champion: champ.name, championColor: champ.color, championRecord: `${champ.wins}-${champ.losses}`,
+      mvp: mvpW ? mvpW.name : 'N/A', mvpTeam: mvpW ? mvpW.teamName : '', awards, leaders,
+      standings: standings.map(t => ({ name: t.name, color: t.color, wins: t.wins, losses: t.losses }))
+    });
+  }
+
+  function downloadSave() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mdba-save.json'; a.click();
+  }
+
+  function resetAll() {
+    if (!confirm('Reset everything? This clears all data for all users.')) return;
+    const initial = buildInitialState();
+    syncState(initial);
+    setView('today'); setSubView(null);
+  }
+
+  if (!state) {
+    return React.createElement('div', { style: { ...S.container, textAlign: 'center', paddingTop: 60 } },
+      React.createElement('h1', { style: { color: PRIMARY } }, 'MDBA Season Simulator'),
+      React.createElement('p', null, 'Connecting to server...')
+    );
+  }
+
+  const todayGames = state.schedule.filter(g => g.day === state.currentDay);
+  const allTodayDone = todayGames.every(g => g.result);
+
+  // ─── Render: Standings ───
+  function renderStandings() {
+    const sorted = [...state.teams].sort((a, b) => (b.wins/Math.max(b.wins+b.losses,1)) - (a.wins/Math.max(a.wins+a.losses,1)) || b.wins - a.wins);
+    const topW = sorted[0] ? sorted[0].wins : 0, topL = sorted[0] ? sorted[0].losses : 0;
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'Standings'),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: S.table },
+          React.createElement('thead', null, React.createElement('tr', null,
+            ['#','Team','W','L','PCT','GB'].map(h => React.createElement('th', { key: h, style: S.th }, h))
+          )),
+          React.createElement('tbody', null, sorted.map((team, i) => {
+            const gp = team.wins + team.losses;
+            const wpct = gp > 0 ? (team.wins / gp).toFixed(3) : '.000';
+            const gb = gp > 0 ? ((topW - topL - team.wins + team.losses) / 2) : 0;
+            return React.createElement('tr', { key: team.name, style: { cursor: 'pointer', background: i % 2 === 0 ? '#fff' : '#f9f9f9' }, onClick: () => setSubView({ type: 'team', data: team.name }) },
+              React.createElement('td', { style: S.td }, i + 1),
+              React.createElement('td', { style: S.td }, React.createElement('span', { style: S.dot(team.color) }), team.name),
+              React.createElement('td', { style: { ...S.td, fontWeight: 700 } }, team.wins),
+              React.createElement('td', { style: S.td }, team.losses),
+              React.createElement('td', { style: S.td }, wpct),
+              React.createElement('td', { style: S.td }, gb === 0 ? '-' : gb.toFixed(1))
+            );
+          }))
+        )
+      )
+    );
+  }
+
+  // ─── Render: Team Detail ───
+  function renderTeamDetail(teamName) {
+    const team = state.teams.find(t => t.name === teamName);
+    if (!team) return React.createElement('div', null, 'Team not found');
+    return React.createElement('div', { style: S.card },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 } },
+        React.createElement('button', { style: S.btnSm, onClick: () => setSubView(null) }, '< Back'),
+        React.createElement('span', { style: { ...S.dot(team.color), width: 16, height: 16 } }),
+        React.createElement('h2', { style: { color: PRIMARY } }, team.name),
+        React.createElement('span', { style: { fontSize: 16, fontWeight: 600 } }, `${team.wins}-${team.losses}`)
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: S.table },
+          React.createElement('thead', null, React.createElement('tr', null,
+            ['Player','POS','OVR','AGE','GP','PPG','RPG','APG','SPG','BPG','FG%','3P%','FT%','MPG'].map(h => React.createElement('th', { key: h, style: S.th }, h))
+          )),
+          React.createElement('tbody', null, team.players.map((p, i) => {
+            const gp = p.stats.gp;
+            return React.createElement('tr', { key: p.name, style: { background: i % 2 === 0 ? '#fff' : '#f9f9f9', ...(i === 5 ? { borderTop: `3px solid ${PRIMARY}` } : {}) } },
+              React.createElement('td', { style: { ...S.td, fontWeight: 600 } }, p.name),
+              React.createElement('td', { style: S.td }, p.pos),
+              React.createElement('td', { style: S.td }, React.createElement('span', { style: S.ovr(p.ovr) }, p.ovr)),
+              React.createElement('td', { style: S.td }, p.age),
+              React.createElement('td', { style: S.td }, gp),
+              React.createElement('td', { style: S.td }, avg(p.stats.pts, gp)),
+              React.createElement('td', { style: S.td }, avg(p.stats.reb, gp)),
+              React.createElement('td', { style: S.td }, avg(p.stats.ast, gp)),
+              React.createElement('td', { style: S.td }, avg(p.stats.stl, gp)),
+              React.createElement('td', { style: S.td }, avg(p.stats.blk, gp)),
+              React.createElement('td', { style: S.td }, pct(p.stats.fgm, p.stats.fga) + '%'),
+              React.createElement('td', { style: S.td }, pct(p.stats.tpm, p.stats.tpa) + '%'),
+              React.createElement('td', { style: S.td }, pct(p.stats.ftm, p.stats.fta) + '%'),
+              React.createElement('td', { style: S.td }, avg(p.stats.min, gp))
+            );
+          }))
+        )
+      )
+    );
+  }
+
+  // ─── Render: Box Score ───
+  function renderBoxScore(gameIdx) {
+    const game = state.schedule[gameIdx];
+    if (!game || !game.result) return React.createElement('div', null, 'No box score');
+    const hT = state.teams[game.home], aT = state.teams[game.away], r = game.result;
+    function teamBox(name, color, stats, isW) {
+      const sorted = [...stats].sort((a, b) => a.rosterIdx - b.rosterIdx);
+      const tot = { min:0,pts:0,reb:0,ast:0,stl:0,blk:0,to:0,pf:0,fgm:0,fga:0,tpm:0,tpa:0,ftm:0,fta:0 };
+      sorted.forEach(p => Object.keys(tot).forEach(k => tot[k] += p[k]));
+      return React.createElement('div', { style: { marginBottom: 16 } },
+        React.createElement('h3', { style: { marginBottom: 8 } }, React.createElement('span', { style: S.dot(color) }), name, isW ? ' (W)' : ' (L)'),
+        React.createElement('div', { style: { overflowX: 'auto' } },
+          React.createElement('table', { style: S.table },
+            React.createElement('thead', null, React.createElement('tr', null,
+              ['Player','MIN','PTS','REB','AST','STL','BLK','TO','PF','FG','3PT','FT'].map(h => React.createElement('th', { key: h, style: S.th }, h))
+            )),
+            React.createElement('tbody', null,
+              ...sorted.map((p, i) => {
+                const hl = p.pts >= 20 ? { color: PRIMARY, fontWeight: 700 } : {};
+                return React.createElement('tr', { key: p.name, style: { background: i % 2 === 0 ? '#fff' : '#f9f9f9', ...(i === 5 ? { borderTop: `3px solid ${PRIMARY}` } : {}) } },
+                  React.createElement('td', { style: { ...S.td, fontWeight: 600, ...hl } }, p.name),
+                  React.createElement('td', { style: S.td }, p.min),
+                  React.createElement('td', { style: { ...S.td, fontWeight: 700, ...hl } }, p.pts),
+                  React.createElement('td', { style: S.td }, p.reb), React.createElement('td', { style: S.td }, p.ast),
+                  React.createElement('td', { style: S.td }, p.stl), React.createElement('td', { style: S.td }, p.blk),
+                  React.createElement('td', { style: S.td }, p.to), React.createElement('td', { style: S.td }, p.pf),
+                  React.createElement('td', { style: S.td }, `${p.fgm}/${p.fga}`),
+                  React.createElement('td', { style: S.td }, `${p.tpm}/${p.tpa}`),
+                  React.createElement('td', { style: S.td }, `${p.ftm}/${p.fta}`)
+                );
+              }),
+              React.createElement('tr', { key: 'tot', style: { background: '#eee', fontWeight: 700 } },
+                React.createElement('td', { style: S.td }, 'TOTALS'), React.createElement('td', { style: S.td }, ''),
+                React.createElement('td', { style: S.td }, tot.pts), React.createElement('td', { style: S.td }, tot.reb),
+                React.createElement('td', { style: S.td }, tot.ast), React.createElement('td', { style: S.td }, tot.stl),
+                React.createElement('td', { style: S.td }, tot.blk), React.createElement('td', { style: S.td }, tot.to),
+                React.createElement('td', { style: S.td }, tot.pf), React.createElement('td', { style: S.td }, `${tot.fgm}/${tot.fga}`),
+                React.createElement('td', { style: S.td }, `${tot.tpm}/${tot.tpa}`), React.createElement('td', { style: S.td }, `${tot.ftm}/${tot.fta}`)
+              )
+            )
+          )
+        )
+      );
+    }
+    return React.createElement('div', { style: S.card },
+      React.createElement('button', { style: { ...S.btnSm, marginBottom: 12 }, onClick: () => setSubView(null) }, '< Back'),
+      React.createElement('div', { style: { textAlign: 'center', marginBottom: 20, padding: 16, background: '#f5f5f5', borderRadius: 8 } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 30 } },
+          React.createElement('div', null, React.createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, aT.name), React.createElement('div', { style: { fontSize: 36, fontWeight: 700, color: r.awayScore > r.homeScore ? PRIMARY : '#666' } }, r.awayScore)),
+          React.createElement('div', { style: { fontSize: 18, color: '#999' } }, '@'),
+          React.createElement('div', null, React.createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, hT.name), React.createElement('div', { style: { fontSize: 36, fontWeight: 700, color: r.homeScore > r.awayScore ? PRIMARY : '#666' } }, r.homeScore))
+        )
+      ),
+      teamBox(aT.name, aT.color, r.awayStats, r.awayScore > r.homeScore),
+      teamBox(hT.name, hT.color, r.homeStats, r.homeScore > r.awayScore)
+    );
+  }
+
+  // ─── Render: Schedule ───
+  function renderSchedule() {
+    const days = [...new Set(state.schedule.map(g => g.day))].sort((a, b) => a - b);
+    const pp = 10, totalPages = Math.ceil(days.length / pp);
+    const pageDays = days.slice(schedulePage * pp, (schedulePage + 1) * pp);
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'Schedule'),
+      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+        React.createElement('button', { style: S.btnSm, onClick: () => setSchedulePage(Math.max(0, schedulePage - 1)), disabled: schedulePage === 0 }, '< Prev'),
+        React.createElement('span', { style: { fontSize: 13, lineHeight: '28px' } }, `Page ${schedulePage + 1} of ${totalPages}`),
+        React.createElement('button', { style: S.btnSm, onClick: () => setSchedulePage(Math.min(totalPages - 1, schedulePage + 1)), disabled: schedulePage >= totalPages - 1 }, 'Next >')
+      ),
+      pageDays.map(day => React.createElement('div', { key: day, style: { marginBottom: 12 } },
+        React.createElement('h4', { style: { fontSize: 13, color: '#666', marginBottom: 4 } }, `Day ${day}`),
+        state.schedule.filter(g => g.day === day).map((game, gi) => {
+          const away = state.teams[game.away], home = state.teams[game.home];
+          const idx = state.schedule.indexOf(game);
+          const played = !!game.result;
+          return React.createElement('div', { key: gi, style: { padding: '6px 10px', background: played ? '#f9f9f9' : '#fff', borderRadius: 4, marginBottom: 2, fontSize: 13, cursor: played ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, onClick: played ? () => setSubView({ type: 'boxscore', data: idx }) : undefined },
+            React.createElement('span', null,
+              React.createElement('span', { style: S.dot(away.color) }),
+              React.createElement('span', { style: played && game.result.awayScore > game.result.homeScore ? { fontWeight: 700, color: PRIMARY } : {} }, away.name),
+              ' @ ',
+              React.createElement('span', { style: S.dot(home.color) }),
+              React.createElement('span', { style: played && game.result.homeScore > game.result.awayScore ? { fontWeight: 700, color: PRIMARY } : {} }, home.name)
+            ),
+            played ? React.createElement('span', { style: { fontWeight: 600 } }, `${game.result.awayScore} - ${game.result.homeScore}`) : React.createElement('span', { style: { color: '#aaa' } }, 'TBD')
+          );
+        })
+      ))
+    );
+  }
+
+  // ─── Render: Today ───
+  function renderToday() {
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, `Day ${state.currentDay}`),
+      state.done ?
+        React.createElement('div', { style: { textAlign: 'center', padding: 30 } },
+          React.createElement('div', { style: { fontSize: 20, fontWeight: 700, color: PRIMARY, marginBottom: 16 } }, 'Season Complete!'),
+          React.createElement('button', { style: { ...S.btn, background: PRIMARY, color: '#fff', fontSize: 16, padding: '12px 24px' }, onClick: startNextSeason }, 'Start Next Season (Draft + Aging)')
+        ) :
+        React.createElement('div', null,
+          todayGames.map((game, i) => {
+            const away = state.teams[game.away], home = state.teams[game.home];
+            const idx = state.schedule.indexOf(game);
+            const played = !!game.result;
+            return React.createElement('div', { key: i, style: { padding: '10px 12px', background: i % 2 === 0 ? '#fff' : '#f9f9f9', borderRadius: 6, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+              React.createElement('span', { style: { fontSize: 14 } },
+                React.createElement('span', { style: S.dot(away.color) }), away.name, ' @ ',
+                React.createElement('span', { style: S.dot(home.color) }), home.name
+              ),
+              played ?
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                  React.createElement('span', { style: { fontWeight: 700 } }, `${game.result.awayScore} - ${game.result.homeScore}`),
+                  React.createElement('button', { style: S.btnSm, onClick: () => setSubView({ type: 'boxscore', data: idx }) }, 'Box Score \u2192')
+                ) :
+                React.createElement('button', { style: { ...S.btnSm, background: '#28a745' }, onClick: () => simGameAtIndex(idx) }, '\u25B6 Sim')
+            );
+          }),
+          allTodayDone && !state.done ? React.createElement('div', { style: { textAlign: 'center', marginTop: 16 } },
+            React.createElement('button', { style: { ...S.btn, background: PRIMARY, color: '#fff', fontSize: 16, padding: '10px 24px' }, onClick: advanceDay }, `Advance to Day ${state.currentDay + 1} \u2192`)
+          ) : null
+        )
+    );
+  }
+
+  // ─── Render: Leaders ───
+  function renderLeaders() {
+    const cats = [{ key:'pts',label:'Scoring' },{ key:'reb',label:'Rebounds' },{ key:'ast',label:'Assists' },{ key:'stl',label:'Steals' },{ key:'blk',label:'Blocks' }];
+    const all = [];
+    state.teams.forEach(team => team.players.forEach(p => { if (p.stats.gp >= 1) all.push({ ...p, teamName: team.name, teamColor: team.color }); }));
+    const sorted = [...all].sort((a, b) => (b.stats[leaderCat]/b.stats.gp) - (a.stats[leaderCat]/a.stats.gp)).slice(0, 20);
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'League Leaders'),
+      React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' } },
+        cats.map(c => React.createElement('button', { key: c.key, style: S.tab(leaderCat === c.key), onClick: () => setLeaderCat(c.key) }, c.label))
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: S.table },
+          React.createElement('thead', null, React.createElement('tr', null,
+            ['#','Player','Team','GP','POS','Per Game'].map(h => React.createElement('th', { key: h, style: S.th }, h))
+          )),
+          React.createElement('tbody', null, sorted.map((p, i) => React.createElement('tr', { key: p.name + p.teamName, style: { background: i < 3 ? '#fff0f0' : i % 2 === 0 ? '#fff' : '#f9f9f9' } },
+            React.createElement('td', { style: { ...S.td, fontWeight: i < 3 ? 700 : 400, color: i < 3 ? PRIMARY : '#333' } }, i + 1),
+            React.createElement('td', { style: { ...S.td, fontWeight: 600 } }, p.name),
+            React.createElement('td', { style: S.td }, React.createElement('span', { style: S.dot(p.teamColor) }), p.teamName),
+            React.createElement('td', { style: S.td }, p.stats.gp),
+            React.createElement('td', { style: S.td }, p.pos),
+            React.createElement('td', { style: { ...S.td, fontWeight: 700 } }, avg(p.stats[leaderCat], p.stats.gp))
+          )))
+        )
+      )
+    );
+  }
+
+  // ─── Render: Awards ───
+  function renderAwards() {
+    const awards = computeAllAwards(state);
+    const leaders = computeLeaders(state);
+    const cats = [{ key:'mvp',label:'MVP' },{ key:'dpoy',label:'Defensive Player of the Year' },{ key:'smoy',label:'Sixth Man of the Year' },{ key:'mip',label:'Most Improved Player' },{ key:'roy',label:'Rookie of the Year' }];
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 16, color: PRIMARY } }, 'Season Awards'),
+      cats.map(cat => {
+        const c = awards[cat.key] || [];
+        if (!c.length) return React.createElement('div', { key: cat.key, style: { marginBottom: 16 } }, React.createElement('h3', { style: { marginBottom: 8 } }, cat.label), React.createElement('p', { style: { color: '#999' } }, 'No eligible candidates'));
+        return React.createElement('div', { key: cat.key, style: { marginBottom: 20 } },
+          React.createElement('h3', { style: { marginBottom: 8 } }, cat.label),
+          c.map((p, i) => {
+            const gp = p.stats.gp;
+            return React.createElement('div', { key: p.name, style: i === 0 ? S.gold : { padding: '8px 12px', background: '#f9f9f9', borderRadius: 6, marginBottom: 4 } },
+              React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' } },
+                React.createElement('div', null,
+                  React.createElement('span', { style: { fontWeight: 700, fontSize: i === 0 ? 16 : 14 } }, `${i + 1}. ${p.name}`),
+                  React.createElement('span', { style: { color: '#666', marginLeft: 8, fontSize: 12 } }, React.createElement('span', { style: S.dot(p.teamColor) }), p.teamName)
+                ),
+                React.createElement('span', { style: { fontSize: 12, color: '#666' } }, `${avg(p.stats.pts,gp)} PPG | ${avg(p.stats.reb,gp)} RPG | ${avg(p.stats.ast,gp)} APG | ${avg(p.stats.stl,gp)} SPG | ${avg(p.stats.blk,gp)} BPG`)
+              )
+            );
+          })
+        );
+      }),
+      React.createElement('h2', { style: { marginBottom: 16, marginTop: 24, color: PRIMARY } }, 'Statistical Champions'),
+      ['pts','reb','ast','stl','blk'].map(cat => {
+        const top3 = (leaders[cat] || []).slice(0, 3);
+        const label = { pts:'Scoring',reb:'Rebounds',ast:'Assists',stl:'Steals',blk:'Blocks' }[cat];
+        return React.createElement('div', { key: cat, style: { marginBottom: 12 } },
+          React.createElement('h4', { style: { fontSize: 14, marginBottom: 4 } }, label),
+          top3.map((p, i) => React.createElement('div', { key: p.name, style: { fontSize: 13, padding: '2px 0' } }, S.medal(i), ' ', p.name, ' (', p.teamName, ') \u2014 ', avg(p.stats[cat], p.stats.gp), '/g'))
+        );
+      })
+    );
+  }
+
+  // ─── Render: Draft ───
+  function renderDraft() {
+    const draft = state.lastDraft;
+    const retired = state.lastRetired;
+    return React.createElement('div', { style: S.card },
+      React.createElement('h2', { style: { marginBottom: 16, color: PRIMARY } }, `Season ${state.seasonNum} Draft`),
+      retired && retired.length > 0 ? React.createElement('div', { style: { marginBottom: 20 } },
+        React.createElement('h3', { style: { marginBottom: 8, color: '#666' } }, `Retired Players (${retired.length})`),
+        retired.map(p => React.createElement('div', { key: p.name, style: { fontSize: 13, padding: '4px 0', borderBottom: '1px solid #eee' } },
+          React.createElement('span', { style: S.dot(p.teamColor) }),
+          React.createElement('span', { style: { fontWeight: 600 } }, p.name),
+          ` (${p.pos}, Age ${p.age}, `, React.createElement('span', { style: S.ovr(p.ovr) }, p.ovr), `) \u2014 ${p.team}`
+        ))
+      ) : React.createElement('p', { style: { color: '#999', marginBottom: 16 } }, 'No retirements this offseason.'),
+      draft ? React.createElement('div', null,
+        React.createElement('h3', { style: { marginBottom: 12 } }, 'Draft Results'),
+        draft.picks.map(p => React.createElement('div', { key: p.pick, style: { padding: '8px 12px', background: p.pick === 1 ? 'linear-gradient(135deg, #fff8e1, #ffe082)' : p.pick % 2 === 0 ? '#f9f9f9' : '#fff', borderRadius: 6, marginBottom: 4, border: p.pick === 1 ? `2px solid ${PRIMARY}` : 'none' } },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' } },
+            React.createElement('div', null,
+              React.createElement('span', { style: { fontWeight: 700, color: PRIMARY, marginRight: 8 } }, `#${p.pick}`),
+              React.createElement('span', { style: S.dot(p.teamColor) }),
+              React.createElement('span', { style: { fontWeight: 600, marginRight: 8 } }, p.team),
+              React.createElement('span', { style: { fontWeight: 700 } }, p.player.name),
+              ' ', React.createElement('span', { style: S.ovr(p.player.ovr) }, p.player.ovr),
+              React.createElement('span', { style: { marginLeft: 8, color: '#666', fontSize: 12 } }, `${p.player.pos} | Age ${p.player.age}`)
+            ),
+            React.createElement('span', { style: { fontSize: 12, color: '#555', fontStyle: 'italic', maxWidth: 350 } }, p.player.info)
+          )
+        )),
+        draft.undrafted && draft.undrafted.length > 0 ? React.createElement('div', { style: { marginTop: 16 } },
+          React.createElement('h4', { style: { marginBottom: 8, color: '#999' } }, 'Undrafted'),
+          draft.undrafted.map(p => React.createElement('div', { key: p.name, style: { fontSize: 12, padding: '2px 0', color: '#888' } },
+            p.name, ' (', p.pos, ', ', React.createElement('span', { style: S.ovr(p.ovr) }, p.ovr), ', Age ', p.age, ') \u2014 ', p.info
+          ))
+        ) : null
+      ) : React.createElement('p', { style: { color: '#999' } }, 'No draft data yet. Complete a season first.')
+    );
+  }
+
+  // ─── Render: History ───
+  function renderHistory() {
+    const history = state.history || [];
+    return React.createElement('div', { style: S.card },
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 } },
+        React.createElement('h2', { style: { color: PRIMARY } }, 'Season History'),
+        history.length > 0 ? (confirmDeleteAll ?
+          React.createElement('div', { style: { display: 'flex', gap: 4 } },
+            React.createElement('button', { style: { ...S.btnSm, background: '#dc3545' }, onClick: () => { const n = { ...state, history: [] }; syncState(n); setConfirmDeleteAll(false); } }, 'Confirm Delete All'),
+            React.createElement('button', { style: S.btnSm, onClick: () => setConfirmDeleteAll(false) }, 'Cancel')
+          ) : React.createElement('button', { style: { ...S.btnSm, background: '#dc3545' }, onClick: () => setConfirmDeleteAll(true) }, 'Delete All')
+        ) : null
+      ),
+      history.length === 0 ? React.createElement('p', { style: { color: '#999' } }, 'No completed seasons yet.') :
+        history.map((season, si) => React.createElement('div', { key: season.id, style: { marginBottom: 12, background: '#f9f9f9', borderRadius: 8, padding: 12 } },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', flexWrap: 'wrap' }, onClick: () => setExpanded(expanded === si ? null : si) },
+            React.createElement('div', null,
+              React.createElement('span', { style: { fontWeight: 700, fontSize: 15 } }, `Season ${season.seasonNum || si + 1}`),
+              React.createElement('span', { style: { marginLeft: 12, fontSize: 13 } }, React.createElement('span', { style: S.dot(season.championColor) }), season.champion, ' | MVP: ', season.mvp),
+              React.createElement('span', { style: { marginLeft: 12, fontSize: 12, color: '#999' } }, season.date)
+            ),
+            confirmDelete === season.id ?
+              React.createElement('div', { style: { display: 'flex', gap: 4 } },
+                React.createElement('button', { style: { ...S.btnSm, background: '#dc3545' }, onClick: (e) => { e.stopPropagation(); const n = { ...state, history: state.history.filter(s => s.id !== season.id) }; syncState(n); setConfirmDelete(null); } }, 'Confirm'),
+                React.createElement('button', { style: S.btnSm, onClick: (e) => { e.stopPropagation(); setConfirmDelete(null); } }, 'Cancel')
+              ) : React.createElement('button', { style: { ...S.btnSm, background: '#dc3545' }, onClick: (e) => { e.stopPropagation(); setConfirmDelete(season.id); } }, 'Delete')
+          ),
+          expanded === si ? React.createElement('div', { style: { marginTop: 12 } },
+            React.createElement('h4', { style: { marginBottom: 8, fontSize: 13 } }, 'Final Standings'),
+            (season.standings || []).map((t, i) => React.createElement('div', { key: t.name, style: { fontSize: 13, padding: '2px 0' } }, `${i+1}. `, React.createElement('span', { style: S.dot(t.color) }), `${t.name} (${t.wins}-${t.losses})`)),
+            season.awards ? React.createElement('div', { style: { marginTop: 12 } },
+              React.createElement('h4', { style: { marginBottom: 4, fontSize: 13 } }, 'Awards'),
+              ['mvp','dpoy','smoy','mip','roy'].map(key => {
+                const label = { mvp:'MVP',dpoy:'DPOY',smoy:'6MOY',mip:'MIP',roy:'ROY' }[key];
+                const w = (season.awards[key] || [])[0];
+                return w ? React.createElement('div', { key, style: { fontSize: 13 } }, `${label}: ${w.name} (${w.teamName})`) : null;
+              })
+            ) : null
+          ) : null
+        ))
+    );
+  }
+
+  // ─── Tabs & Main Layout ───
+  const tabs = [
+    { key: 'today', label: 'Today' },
+    { key: 'standings', label: 'Standings' },
+    { key: 'schedule', label: 'Schedule' },
+    { key: 'leaders', label: 'Leaders' },
+    { key: 'awards', label: 'Awards' },
+    { key: 'draft', label: 'Draft' },
+    { key: 'history', label: 'History' }
+  ];
+
+  function renderContent() {
+    if (subView) {
+      if (subView.type === 'team') return renderTeamDetail(subView.data);
+      if (subView.type === 'boxscore') return renderBoxScore(subView.data);
+    }
+    switch (view) {
+      case 'standings': return renderStandings();
+      case 'schedule': return renderSchedule();
+      case 'today': return renderToday();
+      case 'leaders': return renderLeaders();
+      case 'awards': return renderAwards();
+      case 'draft': return renderDraft();
+      case 'history': return renderHistory();
+      default: return renderToday();
+    }
+  }
+
+  const gamesPlayed = state.schedule.filter(g => g.result).length;
+  const totalGames = state.schedule.length;
+
+  return React.createElement('div', { style: S.container },
+    React.createElement('div', { style: S.header },
+      React.createElement('div', null,
+        React.createElement('span', { style: S.headerTitle }, 'MDBA'),
+        React.createElement('span', { style: { fontSize: 12, marginLeft: 8, opacity: 0.8 } }, `Season ${state.seasonNum || 1} | Day ${state.currentDay} | ${gamesPlayed}/${totalGames}`),
+        React.createElement('span', { style: { ...S.sync, background: connected ? '#4CAF50' : '#f44336', marginLeft: 8 } }),
+        React.createElement('span', { style: { fontSize: 10, opacity: 0.7 } }, connected ? 'LIVE' : 'OFFLINE'),
+        state.done ? React.createElement('span', { style: { marginLeft: 8, background: '#FFD700', color: '#333', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12 } }, '\uD83C\uDFC6 Complete') : null
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+        !state.done ? React.createElement('button', { style: S.btn, onClick: simDay }, '\u25B6 Day') : null,
+        !state.done ? React.createElement('button', { style: S.btn, onClick: simWeek }, '\u25B6\u25B6 Week') : null,
+        !state.done ? React.createElement('button', { style: S.btn, onClick: simAll }, '\u23E9 All') : null,
+        React.createElement('button', { style: S.btn, onClick: downloadSave }, '\u2B07'),
+        React.createElement('button', { style: S.btn, onClick: resetAll }, '\u21BA Reset')
+      )
+    ),
+    React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' } },
+      tabs.map(t => React.createElement('button', { key: t.key, style: S.tab(view === t.key && !subView), onClick: () => { setView(t.key); setSubView(null); } }, t.label))
+    ),
+    renderContent()
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
