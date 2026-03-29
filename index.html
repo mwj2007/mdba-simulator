@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDBA Season Simulator</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:14px}
+::-webkit-scrollbar{height:6px;width:6px}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#1a1a2e;color:#fff;padding:8px 6px;text-align:left;position:sticky;top:0;font-size:11px;font-weight:600;white-space:nowrap;user-select:none}
+td{padding:6px;border-bottom:1px solid #e8e8e8;white-space:nowrap}
+tbody tr:hover{background:#f0f4ff!important}
+button{cursor:pointer;font-family:inherit}
+.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.pill{padding:8px 18px;border-radius:20px;border:none;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:16px;max-width:500px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.headline{padding:12px 16px;border-left:4px solid #B22234;margin-bottom:8px;background:#fafafa;border-radius:0 8px 8px 0;font-size:13px}
+.injured-tag{background:#ff5252;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
+.player-link{cursor:pointer;font-weight:600;border-bottom:1px dashed #999}
+.player-link:hover{color:#B22234;border-bottom-color:#B22234}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ══════════════════════════════════════════
+//  FIREBASE
+// ══════════════════════════════════════════
+firebase.initializeApp({apiKey:"AIzaSyBUwsU6Aj6sTP5Eyc-lSMtXluAReB5j-LU",authDomain:"mdba-simulator.firebaseapp.com",databaseURL:"https://mdba-simulator-default-rtdb.firebaseio.com",projectId:"mdba-simulator",storageBucket:"mdba-simulator.firebasestorage.app",messagingSenderId:"625372009483",appId:"1:625372009483:web:b3eaf88e76959b313b230e"});
+var db=firebase.database(),gameRef=db.ref("mdba5");
+var VERSION=5;
+
+// ══════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════
+var PRIMARY="#B22234";
+var COLORS=["#006D75","#2E4057","#D4213D","#1B4D3E","#C41E3A","#C4975C","#4169E1","#FF6600"];
+var POSITIONS=["PG","SG","SF","PF","C"];
+var HT_RANGE={PG:[73,77],SG:[75,79],SF:[77,81],PF:[79,82],C:[81,86]};
+var WT_RANGE={PG:[180,205],SG:[190,215],SF:[205,230],PF:[220,250],C:[240,275]};
+var h=React.createElement;
+function R(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function RF(a,b){return Math.random()*(b-a)+a}
+function G(m,s){var u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function pick(a){return a[R(0,a.length-1)]}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
+function avg(v,g){return g>0?(v/g).toFixed(1):"0.0"}
+function pct(m,a){return a>0?(m/a*100).toFixed(1):"0.0"}
+function DC(o){return JSON.parse(JSON.stringify(o))}
+function htStr(inches){return Math.floor(inches/12)+"'"+inches%12+'"'}
+function wtStr(w){return w+" lbs"}
+
+// ══════════════════════════════════════════
+//  NAME / PLAYER GENERATION
+// ══════════════════════════════════════════
+var FN=["Jaylen","Marcus","Devonte","Tyrese","Cam","Zaire","Jaden","Keegan","Tre","Malik","Xavier","Kobe","Devin","Andre","Jamal","Donovan","Cade","Scottie","Paolo","Victor","Amen","Ausar","Bronny","Shaedon","Keyonte","Gradey","Reed","Dereck","Bilal","Collin","Anfernee","Scoot","Brandon","Terrence","Jabari","Tari","Luka","Shai","Joel","Damian","Trae","Ja","Evan","Keldon","Coby","Immanuel","Deni","Obi","Ayo","Herb","Ziaire","Josh","Quentin","Caleb","Onyeka","Kofi","Walker","Kai","Jett","Keon","Sharife","Moses","Alperen","Franz","Chet","Bennedict","Mark","TyTy","Ochai","Talen","Bryce","Jarace","Ousmane","Rayan","Sidy","Toumani","Ibou","Nikola","Giannis","Emoni","Keyontae","Adem","Yves","Zach","Kel","Nolan","Rayj","Omari","Trey","DeAndre","Keshon","Amari","Jace","Niko","Khalil","Dillon","Myles","Darius","RJ","Zion","Lamelo","Mikal","Desmond","Bam","Scottie","Jrue","Derrick","Kyrie","Anthony","Russell","Jordan","Blake","Chris","DeMar","Pascal","Julius","Jarrett","Domantas","Tyus","Bones","Tre","Ish","Monte","Davion","Matisse","Luguentz","Nassir","Kenyon","Isaiah","Wendell","Patrick","Marvin","Jalen"];
+var LN=["Johnson","Williams","Brown","Jones","Davis","Thompson","Jackson","Robinson","Harris","Clark","Lewis","Walker","Hall","Allen","Young","King","Wright","Scott","Green","Baker","Adams","Nelson","Carter","Mitchell","Turner","Phillips","Campbell","Parker","Evans","Edwards","Collins","Stewart","Morris","Rogers","Reed","Cook","Morgan","Bell","Murphy","Bailey","Cooper","Richardson","Howard","Ward","Peterson","Gray","James","Watson","Brooks","Kelly","Sanders","Price","Bennett","Wood","Barnes","Ross","Henderson","Coleman","Jenkins","Perry","Powell","Patterson","Hughes","Washington","Butler","Simmons","Foster","Bryant","Alexander","Russell","Griffin","Hayes","Myers","Ford","Hamilton","Graham","Sullivan","Wallace","Woods","West","Jordan","Owens","Reynolds","Fisher","Ellis","Harrison","Gibson","Marshall","Gordon","Warren","Diallo","Coulibaly","Ndiaye","Traore","Okafor","Adebayo","Sengun","Holmgren","Wembanyama","Banchero","Sharpe","Mobley","Cunningham","Suggs","Green","Wagner","Duarte","Kispert","Moody","McBride"];
+var STRENGTHS={PG:["Elite court vision","Shifty handles","Pull-up three","Lockdown on-ball D","Pick & roll maestro","Flashy passer","Lightning quick first step","Clutch gene","Deep range bomber","Transition general","Floater game","Screen navigator","Crossover king","No-look passes","Steal artist"],SG:["Lights-out shooter","Catch & shoot assassin","Shot creator","Two-way menace","Slashing scorer","Off-screen movement","Midrange assassin","Corner sniper","Athletic finisher","Microwave scorer","Fadeaway specialist","Stepback king","Free throw machine","Transition scorer","Contested shot maker"],SF:["Versatile scorer","Lockdown defender","Point forward","Poster dunker","Switchable wing","Tough shot maker","Transition beast","Playmaking forward","3-and-D specialist","Physical finisher","Euro step master","Triple-double threat","Rebounding wing","Isolation scorer","Fast break finisher"],PF:["Stretch four","Post move artist","Rim protector","Glass cleaner","Pick & pop sniper","Face-up game","Athletic freak","Two-way force","Power dunker","Lob threat","Spin move specialist","Drop step master","Weak side shot blocker","Trail three specialist","Putback king"],C:["Dominant post game","Elite rim protector","Rebounding machine","Pick & roll finisher","Passing big man","Stretch five","Paint beast","Shot-blocking anchor","Hook shot specialist","Double-double machine","Tip-in artist","Screen setter","Outlet passer","Drop coverage expert","Verticality master"]};
+var WEAKNESSES=["Turnover prone","Inconsistent shooter","Foul trouble","Poor free throw shooter","Limited range","Slow lateral movement","Ball stopper","Lacks finishing touch","Defensive liability","Low basketball IQ","Injury history","Poor conditioning","One-dimensional","Weak side defender","Poor rebounder for size"];
+
+function genName(used){for(var i=0;i<100;i++){var n=pick(FN).toUpperCase()+" "+pick(LN).toUpperCase();if(!used||!used.has(n))return n}return pick(FN).toUpperCase()+" "+pick(LN).toUpperCase()+R(1,99)}
+
+function genHeight(pos){var r=HT_RANGE[pos]||HT_RANGE.SF;return R(r[0],r[1])}
+function genWeight(pos){var r=WT_RANGE[pos]||WT_RANGE.SF;return R(r[0],r[1])}
+
+function genStrengths(pos,ovr){
+  var pool=STRENGTHS[pos]||STRENGTHS.SF;
+  var s1=pick(pool),s2=pick(pool);while(s2===s1)s2=pick(pool);
+  var result=[s1,s2];
+  if(ovr>=85){var s3=pick(pool);while(s3===s1||s3===s2)s3=pick(pool);result.push(s3)}
+  return result;
+}
+function genWeakness(){return pick(WEAKNESSES)}
+
+function genScout(pos,ovr){
+  var tier=ovr>=88?"Generational talent. ":ovr>=83?"Franchise cornerstone. ":ovr>=78?"Quality starter. ":ovr>=72?"Solid role player. ":"Raw developmental prospect. ";
+  var s=genStrengths(pos,ovr);
+  return tier+s.join(", ");
+}
+
+function makePlayer(name,pos,age,ovr,ht,wt,strengths,weakness,info){
+  return{name:name,pos:pos,age:age,ovr:ovr,prevOvr:ovr,ovrHistory:[ovr],ht:ht||genHeight(pos),wt:wt||genWeight(pos),strengths:strengths||genStrengths(pos,ovr),weakness:weakness||genWeakness(),info:info||"",stats:emptyStats(),injury:null,careerHistory:[]}
+}
+function emptyStats(){return{gp:0,pts:0,reb:0,oreb:0,dreb:0,ast:0,stl:0,blk:0,to:0,pf:0,fgm:0,fga:0,tpm:0,tpa:0,ftm:0,fta:0,min:0}}
+
+// ══════════════════════════════════════════
+//  ORIGINAL ROSTERS (with ht/wt)
+// ══════════════════════════════════════════
+var ROSTERS={"SEATTLE STINGRAYS":[{n:"JALEN MILES",p:"PG",a:27,o:86,ht:76,wt:202,i:"Best handles in MDBA, great passer"},{n:"ISAIAH CARTER",p:"SG",a:20,o:90,ht:77,wt:195,i:"Elite shooter and high IQ"},{n:"BRYCE HARRIS",p:"SF",a:25,o:80,ht:77,wt:208,i:"Spot up shooter"},{n:"MILES WILLIAMS",p:"PF",a:20,o:83,ht:80,wt:220,i:"Athletic, quick first step"},{n:"JULIAN WRIGHT",p:"C",a:26,o:80,ht:83,wt:245,i:"Good post moves"},{n:"COLE RIVER",p:"SF",a:30,o:80,ht:78,wt:215,i:"Midrange specialist"}],"MILWAUKEE COMMANDERS":[{n:"STEVE WRIGHT",p:"PG",a:25,o:81,ht:75,wt:199,i:"Clean layups"},{n:"LAMAR WALLACE",p:"SG",a:25,o:72,ht:78,wt:210,i:"Corner three specialist"},{n:"DESMOND KING",p:"SF",a:21,o:87,ht:81,wt:220,i:"Plays like LeBron"},{n:"TOBIAS SHAW",p:"PF",a:30,o:76,ht:80,wt:235,i:"Good passing big"},{n:"JAXON GAZEL",p:"C",a:19,o:85,ht:84,wt:250,i:"Clean three ball, slow but dominant"},{n:"DORIAN MCOY",p:"SF",a:27,o:79,ht:79,wt:218,i:"Best midrange in league"}],"MIAMI KNIGHTS":[{n:"CAMERON BROOKS",p:"PG",a:25,o:91,ht:75,wt:198,i:"Shifty shooter, elite passing & IQ"},{n:"ELIJAH HAYES",p:"SG",a:23,o:78,ht:77,wt:202,i:"Clean corner three"},{n:"DARIUS WASHINGTON",p:"SF",a:28,o:96,ht:81,wt:225,i:"Great dunker, clean midrange"},{n:"NIKOLAS D'ANGELLO",p:"PF",a:22,o:76,ht:80,wt:230,i:"Good in the post"},{n:"DEVIN KNOX",p:"C",a:26,o:84,ht:83,wt:248,i:"Great rebounder"},{n:"CALEB JOHNSON",p:"PG",a:19,o:80,ht:74,wt:190,i:"Court vision and shooting"}],"BOSTON STARS":[{n:"ANTHONY TOMAS",p:"PG",a:23,o:82,ht:79,wt:200,i:"Good dunker and passer"},{n:"TOM STUNN",p:"SG",a:28,o:72,ht:78,wt:199,i:"Fadeaway specialist"},{n:"EZEKIEL DOME",p:"SF",a:24,o:76,ht:80,wt:218,i:"Athletic dunker"},{n:"ROYCE TUCKER",p:"PF",a:30,o:93,ht:81,wt:240,i:"Insane three ball, post fade master"},{n:"NICOH POKE",p:"C",a:26,o:77,ht:84,wt:252,i:"Passing and post game"},{n:"KEVIN WALKER",p:"PF",a:19,o:79,ht:80,wt:225,i:"Great midrange"}],"DETROIT ROCKETS":[{n:"MASON BLUNT",p:"PG",a:26,o:83,ht:74,wt:185,i:"Best passer in MDBA"},{n:"ZION KING",p:"SG",a:31,o:75,ht:77,wt:197,i:"Good passing guard"},{n:"KELLEN MOORE",p:"SF",a:29,o:81,ht:80,wt:210,i:"Knockdown three shooter"},{n:"NILES MCGEE",p:"PF",a:20,o:95,ht:82,wt:235,i:"Plays like KD"},{n:"SAM CHARRIS",p:"C",a:31,o:82,ht:84,wt:255,i:"Post move master"},{n:"TROY BENSON",p:"C",a:21,o:78,ht:83,wt:248,i:"Strong rebounder"}],"LAS VEGAS ACES":[{n:"CURTIS MALONE",p:"PG",a:21,o:80,ht:76,wt:189,i:"Deep three ball"},{n:"KADE ELLINGTON",p:"SG",a:22,o:84,ht:78,wt:205,i:"Elite shooter"},{n:"ANDREW PETROVIC",p:"SF",a:23,o:78,ht:80,wt:210,i:"Midrange specialist"},{n:"MALIK BELLINI",p:"PF",a:22,o:88,ht:81,wt:230,i:"Best dunker in league"},{n:"IVAN FOX",p:"C",a:26,o:81,ht:83,wt:250,i:"Plays like Jokic"},{n:"METEO CRUZ",p:"SG",a:23,o:76,ht:78,wt:200,i:"Unorthodox but effective shooter"}],"KANSAS CITY MONARCHS":[{n:"TYLER CORE",p:"PG",a:22,o:79,ht:75,wt:197,i:"Knockdown three shooter"},{n:"CALVIN CUNNINGHAM",p:"SG",a:19,o:90,ht:77,wt:210,i:"Elite dunker, fadeaway and midrange specialist"},{n:"SAM DUFFE",p:"SF",a:30,o:71,ht:79,wt:215,i:"Midrange specialist"},{n:"JAXON PEIRCE",p:"PF",a:19,o:86,ht:82,wt:225,i:"Plays like Wemby"},{n:"DOMINIC WELLS",p:"C",a:20,o:86,ht:85,wt:265,i:"Shaq-like dominance"},{n:"MAX WALKER",p:"PF",a:19,o:73,ht:80,wt:228,i:"Power dunker"}],"NEW YORK LAZERS":[{n:"MILES ROBINSON",p:"PG",a:19,o:85,ht:75,wt:187,i:"Pure shooter"},{n:"ANTHONY LEWIS",p:"SG",a:19,o:87,ht:77,wt:200,i:"Slashing scorer"},{n:"LOGAN TUBBS",p:"SF",a:21,o:76,ht:79,wt:241,i:"Catch and shoot specialist"},{n:"ETHAN BROWN",p:"PF",a:22,o:77,ht:80,wt:225,i:"Defensive specialist"},{n:"XAVIER THOMPSON",p:"C",a:19,o:88,ht:84,wt:255,i:"Elite shot blocker"}]};
+
+function initTeams(){
+  var names=Object.keys(ROSTERS);
+  return names.map(function(name,ti){
+    var players=ROSTERS[name].map(function(r){
+      return makePlayer(r.n,r.p,r.a,r.o,r.ht,r.wt,genStrengths(r.p,r.o),genWeakness(),r.i);
+    }).sort(function(a,b){return b.ovr-a.ovr});
+    return{name:name,color:COLORS[ti%COLORS.length],players:players,wins:0,losses:0};
+  });
+}
+
+// ══════════════════════════════════════════
+//  SCHEDULE
+// ══════════════════════════════════════════
+function genSchedule(teams){
+  var n=teams.length,pairs=[],counts=new Array(n).fill(0);
+  // 82 games per team, n-1=7 opponents. 11 games vs each = 77, need 5 more.
+  // Play 12 games vs some opponents, 11 vs others
+  var base=Math.floor(82/(n-1)); // 11
+  var extra=82-base*(n-1); // 5 extra games to distribute
+  for(var i=0;i<n;i++){
+    var opponents=[];
+    for(var j=0;j<n;j++){if(j!==i)opponents.push(j)}
+    // Shuffle opponents to randomize who gets extra games
+    for(var k=opponents.length-1;k>0;k--){var r=R(0,k);var tmp=opponents[k];opponents[k]=opponents[r];opponents[r]=tmp}
+  }
+  // Build matchup counts: each pair plays 'base' games, some play base+1
+  var matchupCounts={};
+  for(var i=0;i<n;i++)for(var j=i+1;j<n;j++)matchupCounts[i+"-"+j]=0;
+  // First pass: base games for everyone
+  for(var i=0;i<n;i++){
+    for(var j=i+1;j<n;j++){
+      for(var k=0;k<base;k++){
+        var hi=k%2===0?i:j,ai=k%2===0?j:i;
+        pairs.push({home:hi,away:ai});counts[hi]++;counts[ai]++;
+        matchupCounts[i+"-"+j]++;
+      }
+    }
+  }
+  // Second pass: systematically add games until all teams have 82
+  // Sort teams by how many games they still need (most needed first)
+  for(var pass=0;pass<20;pass++){
+    var need=[];
+    for(var i=0;i<n;i++){if(counts[i]<82)need.push({idx:i,gap:82-counts[i]})}
+    need.sort(function(a,b){return b.gap-a.gap});
+    if(need.length<2)break;
+    // Pair up teams that need games, starting with those needing the most
+    var paired={};
+    for(var x=0;x<need.length;x++){
+      if(paired[need[x].idx])continue;
+      for(var y=x+1;y<need.length;y++){
+        if(paired[need[y].idx])continue;
+        var a=need[x].idx,b=need[y].idx;
+        pairs.push({home:a,away:b});counts[a]++;counts[b]++;
+        paired[a]=true;paired[b]=true;
+        break;
+      }
+    }
+  }
+  for(var i=pairs.length-1;i>0;i--){var j=R(0,i);var t=pairs[i];pairs[i]=pairs[j];pairs[j]=t}
+  var sched=[],assigned=new Array(pairs.length).fill(false),day=1,total=0;
+  while(total<pairs.length){
+    var busy={};
+    for(var i=0;i<pairs.length;i++){
+      if(assigned[i])continue;var g=pairs[i];
+      if(busy[g.home]||busy[g.away])continue;
+      busy[g.home]=true;busy[g.away]=true;
+      sched.push({home:g.home,away:g.away,day:day,result:null});assigned[i]=true;total++;
+    }
+    day++;
+  }
+  return sched;
+}
+
+// ══════════════════════════════════════════
+//  SIMULATION ENGINE
+// ══════════════════════════════════════════
+var PB={PG:{reb:3.8,ast:7.5,blk:0.3,stl:1.6},SG:{reb:4.0,ast:4.0,blk:0.4,stl:1.3},SF:{reb:6.0,ast:3.5,blk:0.7,stl:1.2},PF:{reb:8.5,ast:2.8,blk:1.2,stl:0.8},C:{reb:11.0,ast:2.5,blk:2.2,stl:0.7}};
+
+function getAvailablePlayers(team){
+  return team.players.filter(function(p){return!p.injury||p.injury.games<=0});
+}
+
+function simGame(ht,at,headlines){
+  var hPlayers=getAvailablePlayers(ht);
+  var aPlayers=getAvailablePlayers(at);
+  if(hPlayers.length<3)hPlayers=ht.players.slice(0,5);
+  if(aPlayers.length<3)aPlayers=at.players.slice(0,5);
+
+  var hOvr=hPlayers.reduce(function(s,p){return s+p.ovr},0)/hPlayers.length;
+  var aOvr=aPlayers.reduce(function(s,p){return s+p.ovr},0)/aPlayers.length;
+  var diff=(hOvr-aOvr)*0.18;
+  var pace=RF(104,116),hadv=RF(0.5,3.5);
+  var hTarget=Math.round(clamp(pace+diff+hadv+G(0,7),92,138));
+  var aTarget=Math.round(clamp(pace-diff-hadv+G(0,7),92,138));
+
+  function simTeam(players,target){
+    var stats=[],totalPts=0;
+    players.forEach(function(p,idx){
+      var base=PB[p.pos]||PB.SF;
+      var min=idx<5?RF(30,38):idx<8?RF(16,26):idx<11?RF(6,16):RF(0,6);
+      var ms=min/36,form=RF(0.6,1.4);
+      var power=Math.pow(p.ovr/78,2.8)*form;
+      var star=p.ovr>=92?2.1:p.ovr>=87?1.6:p.ovr>=82?1.3:p.ovr>=77?1.1:1.0;
+
+      var usage=(idx<5?RF(0.10,0.21):RF(0.04,0.12))*power;
+      var fga=Math.round(clamp(usage*85*ms,0,idx<5?32:16));
+      var fgp=clamp(0.34+(p.ovr-60)*0.005+G(0,0.06),0.28,0.62);
+      var fgm=Math.round(fga*fgp);
+      var tpa=Math.round(fga*RF(0.20,0.48));
+      var tpp=clamp(0.27+(p.ovr-60)*0.004+G(0,0.07),0.20,0.48);
+      var tpm=Math.round(tpa*tpp);
+      var fta=Math.round(clamp(fga*RF(0.15,0.40),0,16));
+      var ftp=clamp(0.60+(p.ovr-60)*0.008+G(0,0.08),0.50,0.95);
+      var ftm=Math.round(fta*ftp);
+      var pts=(fgm-tpm)*2+tpm*3+ftm;
+
+      var rebM=(p.pos==="C"||p.pos==="PF")?star:1.0;
+      var reb=Math.round(clamp(base.reb*ms*RF(0.5,1.5)*rebM,0,24));
+      var oreb=Math.round(reb*RF(0.12,0.35));
+      var ast=Math.round(clamp(base.ast*ms*power*RF(0.5,1.4)*(p.pos==="PG"?star:1.0),0,22));
+      var stl=Math.round(clamp(base.stl*ms*RF(0.3,1.8)*star,0,8));
+      var blk=Math.round(clamp(base.blk*ms*RF(0.3,2.2)*(p.pos==="C"?star*1.4:star),0,12));
+      var to=Math.round(clamp(RF(0.3,3.5)*ms,0,8));
+      var pf=Math.round(clamp(RF(0.8,4.5)*ms,0,6));
+
+      totalPts+=pts;
+      stats.push({name:p.name,pos:p.pos,ovr:p.ovr,ht:p.ht,wt:p.wt,min:Math.round(min),pts:pts,reb:reb,oreb:oreb,dreb:reb-oreb,ast:ast,stl:stl,blk:blk,to:to,pf:pf,fgm:fgm,fga:fga,tpm:tpm,tpa:tpa,ftm:ftm,fta:fta,ri:idx});
+    });
+    // normalize weighted by OVR
+    if(totalPts>0&&totalPts!==target){
+      var totO=stats.reduce(function(s,p){return s+p.ovr},0);
+      var d=target-totalPts;
+      stats.forEach(function(ps){ps.pts+=Math.round(d*(ps.ovr/totO))});
+      var rem=target-stats.reduce(function(s,p){return s+p.pts},0);
+      if(rem!==0)stats.reduce(function(b,p){return p.ovr>b.ovr?p:b},stats[0]).pts+=rem;
+      stats.forEach(function(ps){if(ps.pts<0)ps.pts=0});
+    }
+    return stats;
+  }
+
+  var hs=simTeam(hPlayers,hTarget),as=simTeam(aPlayers,aTarget);
+  var hT=hs.reduce(function(s,p){return s+p.pts},0);
+  var aT=as.reduce(function(s,p){return s+p.pts},0);
+  if(hT===aT){hs[R(0,Math.min(4,hs.length-1))].pts+=2;hT+=2}
+
+  // INJURIES — 3% chance per game for any player
+  var injuries=[];
+  function checkInjury(players,teamName){
+    players.forEach(function(p){
+      if(Math.random()<0.03){
+        var games=R(1,15);
+        var types=["sprained ankle","knee soreness","hamstring strain","back tightness","shoulder injury","groin strain","calf strain","wrist sprain","concussion protocol","quad contusion"];
+        var type=pick(types);
+        p.injury={games:games,type:type};
+        injuries.push({name:p.name,team:teamName,type:type,games:games});
+        if(headlines)headlines.push({type:"injury",text:p.name+" ("+teamName+") OUT "+games+" games with "+type,icon:"\uD83C\uDFE5"});
+      }
+    });
+  }
+  checkInjury(hPlayers,ht.name);
+  checkInjury(aPlayers,at.name);
+
+  // Generate headlines for big performances
+  if(headlines){
+    var allStats=hs.concat(as);
+    allStats.forEach(function(ps){
+      var teamName=hs.indexOf(ps)>=0?ht.name:at.name;
+      if(ps.pts>=40)headlines.push({type:"performance",text:ps.name+" ERUPTS for "+ps.pts+" points! ("+teamName+")",icon:"\uD83D\uDD25"});
+      else if(ps.pts>=30)headlines.push({type:"performance",text:ps.name+" drops "+ps.pts+" in "+(hT>aT&&hs.indexOf(ps)>=0||aT>hT&&as.indexOf(ps)>=0?"a win":"a loss")+" ("+teamName+")",icon:"\u2B50"});
+      if(ps.reb>=15)headlines.push({type:"performance",text:ps.name+" dominates the glass with "+ps.reb+" rebounds ("+teamName+")",icon:"\uD83D\uDCAA"});
+      if(ps.ast>=12)headlines.push({type:"performance",text:ps.name+" dishes "+ps.ast+" assists ("+teamName+")",icon:"\uD83C\uDFAF"});
+      if(ps.blk>=5)headlines.push({type:"performance",text:ps.name+" records "+ps.blk+" BLOCKS ("+teamName+")",icon:"\uD83D\uDEAB"});
+      if(ps.stl>=5)headlines.push({type:"performance",text:ps.name+" with "+ps.stl+" steals ("+teamName+")",icon:"\uD83D\uDC40"});
+      // triple double
+      if(ps.pts>=10&&ps.reb>=10&&ps.ast>=10)headlines.push({type:"milestone",text:"\uD83D\uDCA5 TRIPLE-DOUBLE: "+ps.name+" with "+ps.pts+"/"+ps.reb+"/"+ps.ast+" ("+teamName+")",icon:"\uD83D\uDCA5"});
+    });
+    // blowout
+    if(Math.abs(hT-aT)>=25){
+      var winner=hT>aT?ht.name:at.name;
+      headlines.push({type:"game",text:winner+" wins by "+Math.abs(hT-aT)+" in a BLOWOUT",icon:"\uD83D\uDCA8"});
+    }
+    // buzzer beater (close game)
+    if(Math.abs(hT-aT)<=3){
+      headlines.push({type:"game",text:"THRILLER! "+(hT>aT?ht.name:at.name)+" edges "+(hT>aT?at.name:ht.name)+" "+Math.max(hT,aT)+"-"+Math.min(hT,aT),icon:"\uD83D\uDE31"});
+    }
+  }
+
+  return{homeScore:hT,awayScore:aT,homeStats:hs,awayStats:as,injuries:injuries};
+}
+
+function accumStats(team,gs){
+  gs.forEach(function(g){
+    var p=team.players.find(function(x){return x.name===g.name});
+    if(!p)return;var s=p.stats;
+    s.gp++;s.pts+=g.pts;s.reb+=g.reb;s.oreb+=g.oreb;s.dreb+=g.dreb;
+    s.ast+=g.ast;s.stl+=g.stl;s.blk+=g.blk;s.to+=g.to;s.pf+=g.pf;
+    s.fgm+=g.fgm;s.fga+=g.fga;s.tpm+=g.tpm;s.tpa+=g.tpa;s.ftm+=g.ftm;s.fta+=g.fta;s.min+=g.min;
+  });
+}
+
+function tickInjuries(teams){
+  teams.forEach(function(t){t.players.forEach(function(p){
+    if(p.injury&&p.injury.games>0)p.injury.games--;
+    if(p.injury&&p.injury.games<=0)p.injury=null;
+  })});
+}
+
+// ══════════════════════════════════════════
+//  AGING / RETIREMENT / DRAFT / FREE AGENCY
+// ══════════════════════════════════════════
+function ageAndRetire(teams){
+  var retired=[];
+  teams.forEach(function(team){
+    var rem=[];
+    team.players.forEach(function(p,i){
+      p.prevOvr=p.ovr;p.age++;
+      if(p.age<=25)p.ovr=Math.min(99,p.ovr+R(0,3));
+      else if(p.age<=30)p.ovr=clamp(p.ovr+R(-2,1),50,99);
+      else if(p.age<=33)p.ovr=Math.max(50,p.ovr+R(-3,0));
+      else p.ovr=Math.max(45,p.ovr+R(-5,-1));
+      if(!p.ovrHistory)p.ovrHistory=[];p.ovrHistory.push(p.ovr);
+      var chance=0;
+      if(p.age>=38)chance=1;else if(p.age>=37)chance=0.9;else if(p.age>=36)chance=0.75;else if(p.age>=35)chance=0.55;else if(p.age>=34)chance=0.35;
+      if(Math.random()<chance){rem.push(i);retired.push({name:p.name,pos:p.pos,age:p.age,ovr:p.ovr,ht:p.ht,wt:p.wt,team:team.name,teamColor:team.color,strengths:p.strengths})}
+    });
+    rem.sort(function(a,b){return b-a}).forEach(function(i){team.players.splice(i,1)});
+  });
+  return retired;
+}
+
+function runDraft(teams,numRetired){
+  var numPicks=teams.length,numP=Math.max(numPicks,numRetired)+6;
+  var used=new Set();teams.forEach(function(t){t.players.forEach(function(p){used.add(p.name)})});
+  var prospects=[];
+  for(var i=0;i<numP;i++){
+    var pos=pick(POSITIONS),age=R(19,22);
+    var pctile=1-(i/numP);
+    var ovr=clamp(Math.round(62+pctile*26+G(0,4)),58,92);
+    var name=genName(used);used.add(name);
+    prospects.push({name:name,pos:pos,age:age,ovr:ovr,ht:genHeight(pos),wt:genWeight(pos),strengths:genStrengths(pos,ovr),weakness:genWeakness(),info:genScout(pos,ovr),draftRank:i+1});
+  }
+  prospects.sort(function(a,b){return b.ovr-a.ovr});
+  prospects.forEach(function(p,i){p.draftRank=i+1});
+  // lottery
+  var sorted=teams.slice().sort(function(a,b){return(a.wins/Math.max(a.wins+a.losses,1))-(b.wins/Math.max(b.wins+b.losses,1))});
+  var weights=sorted.map(function(_,i){return sorted.length-i+R(0,3)});
+  var order=[],usedIdx=new Set();
+  while(order.length<sorted.length){
+    var tot=0;for(var i=0;i<weights.length;i++)if(!usedIdx.has(i))tot+=weights[i];
+    var r=Math.random()*tot;
+    for(var i=0;i<sorted.length;i++){if(usedIdx.has(i))continue;r-=weights[i];if(r<=0){order.push(sorted[i]);usedIdx.add(i);break}}
+    if(order.length<sorted.length&&usedIdx.size===order.length){for(var i=0;i<sorted.length;i++)if(!usedIdx.has(i)){order.push(sorted[i]);usedIdx.add(i)}}
+  }
+  var picks=[],avail=prospects.slice();
+  order.forEach(function(team,pi){
+    if(!avail.length)return;var ch=avail.shift();
+    team.players.push(makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.strengths,ch.weakness,ch.info));
+    team.players.sort(function(a,b){return b.ovr-a.ovr});
+    picks.push({pick:pi+1,team:team.name,teamColor:team.color,player:ch});
+  });
+  return{picks:picks,prospects:prospects,undrafted:avail};
+}
+
+// ══════════════════════════════════════════
+//  PLAYOFFS
+// ══════════════════════════════════════════
+function initPlayoffs(teams){
+  var sorted=teams.slice().sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins});
+  var top4=sorted.slice(0,4);
+  return{round:"semis",matchups:[{higher:0,lower:3,hWins:0,lWins:0,games:[],hName:top4[0].name,lName:top4[3].name,hColor:top4[0].color,lColor:top4[3].color},{higher:1,lower:2,hWins:0,lWins:0,games:[],hName:top4[1].name,lName:top4[2].name,hColor:top4[1].color,lColor:top4[2].color}],seeds:top4.map(function(t){return{name:t.name,color:t.color}}),finals:null,champion:null};
+}
+
+function simPlayoffGame(st,matchupIdx){
+  var po=st.playoffs,mu=po.round==="finals"?po.finals:po.matchups[matchupIdx];
+  var hTeam=st.teams.find(function(t){return t.name===mu.hName});
+  var lTeam=st.teams.find(function(t){return t.name===mu.lName});
+  if(!hTeam||!lTeam)return;
+  var homeTeam=mu.games.length%2===0?hTeam:lTeam;
+  var awayTeam=homeTeam===hTeam?lTeam:hTeam;
+  var headlines=st.headlines||[];
+  var result=simGame(homeTeam,awayTeam,headlines);
+  mu.games.push(result);
+  var hWon=(homeTeam===hTeam&&result.homeScore>result.awayScore)||(awayTeam===hTeam&&result.awayScore>result.homeScore);
+  if(hWon)mu.hWins++;else mu.lWins++;
+  accumStats(homeTeam,result.homeStats);accumStats(awayTeam,result.awayStats);
+  tickInjuries(st.teams);
+  // Check series over
+  if(mu.hWins>=4||mu.lWins>=4){
+    var winner=mu.hWins>=4?mu.hName:mu.lName;
+    var winColor=mu.hWins>=4?mu.hColor:mu.lColor;
+    headlines.push({type:"playoff",text:winner+" wins the "+(po.round==="finals"?"CHAMPIONSHIP":"series")+"!",icon:po.round==="finals"?"\uD83C\uDFC6":"\uD83C\uDFC0"});
+    if(po.round==="semis"){
+      var otherMu=po.matchups[matchupIdx===0?1:0];
+      var otherDone=otherMu.hWins>=4||otherMu.lWins>=4;
+      if(otherDone){
+        var w1=po.matchups[0].hWins>=4?po.matchups[0].hName:po.matchups[0].lName;
+        var c1=po.matchups[0].hWins>=4?po.matchups[0].hColor:po.matchups[0].lColor;
+        var w2=po.matchups[1].hWins>=4?po.matchups[1].hName:po.matchups[1].lName;
+        var c2=po.matchups[1].hWins>=4?po.matchups[1].hColor:po.matchups[1].lColor;
+        po.finals={higher:0,lower:1,hWins:0,lWins:0,games:[],hName:w1,lName:w2,hColor:c1,lColor:c2};
+        po.round="finals";
+        headlines.push({type:"playoff",text:"FINALS SET: "+w1+" vs "+w2,icon:"\uD83D\uDD25"});
+      }
+    } else if(po.round==="finals"){
+      po.champion={name:winner,color:winColor};
+    }
+  }
+  st.headlines=headlines;
+}
+
+// ══════════════════════════════════════════
+//  AWARDS / LEADERS
+// ══════════════════════════════════════════
+function getAwards(st){
+  var all=[];
+  st.teams.forEach(function(t){
+    var wp=t.wins/Math.max(t.wins+t.losses,1);
+    t.players.forEach(function(p,i){if(p.stats.gp>=1)all.push({name:p.name,pos:p.pos,ovr:p.ovr,age:p.age,ht:p.ht,wt:p.wt,stats:p.stats,strengths:p.strengths,teamName:t.name,teamColor:t.color,ri:i,wp:wp,prevOvr:p.prevOvr||p.ovr})});
+  });
+  function sc(list,fn){return list.map(function(p){return Object.assign({},p,{score:fn(p)})}).sort(function(a,b){return b.score-a.score}).slice(0,5)}
+  var gp5=all.filter(function(p){return p.stats.gp>=5});
+  return{
+    mvp:sc(gp5,function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.7+(p.stats.ast/g)*.85+(p.stats.stl/g)*1.2+p.stats.blk/g+p.wp*18}),
+    dpoy:sc(gp5,function(p){var g=p.stats.gp;return(p.stats.stl/g)*2+(p.stats.blk/g)*2.5+(p.stats.reb/g)*.4}),
+    smoy:sc(all.filter(function(p){return p.ri>=5&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.5+(p.stats.ast/g)*.7}),
+    mip:sc(all.filter(function(p){return p.ovr<=80&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g-p.ovr*.2+(p.stats.reb/g)*.3+(p.stats.ast/g)*.3}),
+    roy:sc(all.filter(function(p){return p.age<=22&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.5+(p.stats.ast/g)*.5})
+  };
+}
+function getLeaders(st){
+  var all=[];st.teams.forEach(function(t){t.players.forEach(function(p){if(p.stats.gp>=1)all.push(Object.assign({},p,{teamName:t.name,teamColor:t.color}))})});
+  function top(k){return all.slice().sort(function(a,b){return(b.stats[k]/b.stats.gp)-(a.stats[k]/a.stats.gp)}).slice(0,20)}
+  return{pts:top("pts"),reb:top("reb"),ast:top("ast"),stl:top("stl"),blk:top("blk")};
+}
+function getPowerRankings(st){
+  // Based on win%, recent form (last 10), and avg OVR
+  return st.teams.slice().sort(function(a,b){
+    var aWp=a.wins/Math.max(a.wins+a.losses,1);
+    var bWp=b.wins/Math.max(b.wins+b.losses,1);
+    var aOvr=a.players.reduce(function(s,p){return s+p.ovr},0)/a.players.length;
+    var bOvr=b.players.reduce(function(s,p){return s+p.ovr},0)/b.players.length;
+    var aScore=aWp*60+aOvr*0.4;var bScore=bWp*60+bOvr*0.4;
+    return bScore-aScore;
+  });
+}
+
+// ══════════════════════════════════════════
+//  REACT APP
+// ══════════════════════════════════════════
+function App(){
+  var _=React.useState;
+  var _s=_(null),state=_s[0],setState=_s[1];
+  var _v=_("today"),view=_v[0],setView=_v[1];
+  var _sv=_(null),sub=_sv[0],setSub=_sv[1];
+  var _sp=_(0),sPage=_sp[0],setSPage=_sp[1];
+  var _lc=_("pts"),lCat=_lc[0],setLCat=_lc[1];
+  var _exp=_(null),exp=_exp[0],setExp=_exp[1];
+  var _cd=_(null),cd=_cd[0],setCd=_cd[1];
+  var _cda=_(false),cda=_cda[0],setCda=_cda[1];
+  var _conn=_(false),conn=_conn[0],setConn=_conn[1];
+  var _ps=_("ovr"),pSort=_ps[0],setPSort=_ps[1];
+  var _pd=_(true),pDir=_pd[0],setPDir=_pd[1];
+  var _modal=_(null),modal=_modal[0],setModal=_modal[1];
+  var _tradeA=_(0),tradeTeamA=_tradeA[0],setTradeTeamA=_tradeA[1];
+  var _tradeB=_(1),tradeTeamB=_tradeB[0],setTradeTeamB=_tradeB[1];
+  var _tradePA=_([]),tradePlayersA=_tradePA[0],setTradePlayersA=_tradePA[1];
+  var _tradePB=_([]),tradePlayersB=_tradePB[0],setTradePlayersB=_tradePB[1];
+  var lastWId=React.useRef(null);
+
+  // FIREBASE SYNC
+  React.useEffect(function(){
+    db.ref(".info/connected").on("value",function(s){setConn(!!s.val())});
+    gameRef.on("value",function(snap){
+      var val=snap.val();
+      if(!val||val.version!==VERSION){gameRef.set(buildInit());return}
+      if(val._wid&&val._wid===lastWId.current){lastWId.current=null;return}
+      // Firebase converts arrays to objects — fix them
+      try{
+        if(val.teams&&!Array.isArray(val.teams))val.teams=Object.values(val.teams);
+        if(val.schedule&&!Array.isArray(val.schedule))val.schedule=Object.values(val.schedule);
+        if(val.history&&!Array.isArray(val.history))val.history=Object.values(val.history);
+        if(val.freeAgents&&!Array.isArray(val.freeAgents))val.freeAgents=Object.values(val.freeAgents);
+        if(val.allRetired&&!Array.isArray(val.allRetired))val.allRetired=Object.values(val.allRetired);
+        if(val.headlines&&!Array.isArray(val.headlines))val.headlines=Object.values(val.headlines);
+        if(val.teams)val.teams.forEach(function(t){
+          if(t.players&&!Array.isArray(t.players))t.players=Object.values(t.players);
+          if(t.players)t.players.forEach(function(p){
+            if(p.strengths&&!Array.isArray(p.strengths))p.strengths=Object.values(p.strengths);
+            if(p.ovrHistory&&!Array.isArray(p.ovrHistory))p.ovrHistory=Object.values(p.ovrHistory);
+          });
+        });
+        if(val.schedule)val.schedule.forEach(function(g){
+          if(g.result){
+            if(g.result.homeStats&&!Array.isArray(g.result.homeStats))g.result.homeStats=Object.values(g.result.homeStats);
+            if(g.result.awayStats&&!Array.isArray(g.result.awayStats))g.result.awayStats=Object.values(g.result.awayStats);
+            if(g.result.injuries&&!Array.isArray(g.result.injuries))g.result.injuries=Object.values(g.result.injuries);
+          }
+        });
+        if(val.playoffs){
+          if(val.playoffs.matchups&&!Array.isArray(val.playoffs.matchups))val.playoffs.matchups=Object.values(val.playoffs.matchups);
+          if(val.playoffs.seeds&&!Array.isArray(val.playoffs.seeds))val.playoffs.seeds=Object.values(val.playoffs.seeds);
+          if(val.playoffs.matchups)val.playoffs.matchups.forEach(function(m){if(m.games&&!Array.isArray(m.games))m.games=Object.values(m.games)});
+          if(val.playoffs.finals&&val.playoffs.finals.games&&!Array.isArray(val.playoffs.finals.games))val.playoffs.finals.games=Object.values(val.playoffs.finals.games);
+        }
+        if(val.lastDraft){
+          if(val.lastDraft.picks&&!Array.isArray(val.lastDraft.picks))val.lastDraft.picks=Object.values(val.lastDraft.picks);
+          if(val.lastDraft.prospects&&!Array.isArray(val.lastDraft.prospects))val.lastDraft.prospects=Object.values(val.lastDraft.prospects);
+          if(val.lastDraft.undrafted&&!Array.isArray(val.lastDraft.undrafted))val.lastDraft.undrafted=Object.values(val.lastDraft.undrafted);
+        }
+        if(val.lastRetired&&!Array.isArray(val.lastRetired))val.lastRetired=Object.values(val.lastRetired);
+      }catch(fixErr){console.warn("Array fix error:",fixErr)}
+      setState(val);
+    });
+  },[]);
+
+  function buildInit(){
+    var teams=initTeams(),sched=genSchedule(teams);
+    return{teams:teams,schedule:sched,currentDay:1,done:false,history:[],seasonNum:1,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:[],playoffs:null,phase:"season",version:VERSION};
+  }
+
+  function sync(s){var wid="w"+Date.now()+Math.random();lastWId.current=wid;s._wid=wid;s.version=VERSION;setState(s);gameRef.set(s)}
+
+  // ── ACTIONS ──
+  function processGame(n,gi){
+    var g=n.schedule[gi];if(g.result)return;
+    var ht=n.teams[g.home],at=n.teams[g.away];
+    if(!n.headlines)n.headlines=[];
+    g.result=simGame(ht,at,n.headlines);
+    if(g.result.homeScore>g.result.awayScore){ht.wins++;at.losses++}else{at.wins++;ht.losses++}
+    accumStats(ht,g.result.homeStats);accumStats(at,g.result.awayStats);
+    tickInjuries(n.teams);
+  }
+
+  function simIdx(gi){var n=DC(state);processGame(n,gi);checkSeasonEnd(n);sync(n)}
+
+  function simDay(){
+    var n=DC(state);
+    n.schedule.filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,n.schedule.indexOf(g))});
+    var allDayDone=!n.schedule.some(function(g){return g.day===n.currentDay&&!g.result});
+    if(allDayDone){var mx=Math.max.apply(null,n.schedule.map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++}
+    checkSeasonEnd(n);sync(n);
+  }
+
+  function advDay(){var n=DC(state);var mx=Math.max.apply(null,n.schedule.map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++;sync(n)}
+
+  function simWeek(){
+    var n=DC(state);
+    for(var d=0;d<7;d++){
+      n.schedule.filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,n.schedule.indexOf(g))});
+      var allDayDone=!n.schedule.some(function(g){return g.day===n.currentDay&&!g.result});
+      if(allDayDone){var mx=Math.max.apply(null,n.schedule.map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++;else break}
+    }
+    checkSeasonEnd(n);sync(n);
+  }
+
+  function simAll(){
+    var n=DC(state);
+    n.schedule.forEach(function(g,i){if(!g.result)processGame(n,i)});
+    n.done=true;n.currentDay=Math.max.apply(null,n.schedule.map(function(g){return g.day}));
+    n.phase="playoffs";n.playoffs=initPlayoffs(n.teams);
+    if(!n.headlines)n.headlines=[];
+    n.headlines.push({type:"playoff",text:"PLAYOFFS BEGIN! Top 4 teams battle for the championship!",icon:"\uD83C\uDFC6"});
+    sync(n);
+  }
+
+  function checkSeasonEnd(n){
+    if(n.schedule.every(function(g){return g.result})){
+      n.done=true;n.phase="playoffs";n.playoffs=initPlayoffs(n.teams);
+      if(!n.headlines)n.headlines=[];
+      n.headlines.push({type:"playoff",text:"REGULAR SEASON COMPLETE! Playoffs are here!",icon:"\uD83C\uDFC6"});
+    }
+  }
+
+  function simPlayoffGameAction(muIdx){
+    var n=DC(state);simPlayoffGame(n,muIdx);
+    if(n.playoffs.champion){n.phase="offseason";archiveSeason(n)}
+    sync(n);
+  }
+
+  function archiveSeason(st){
+    var sorted=st.teams.slice().sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins});
+    var aw=getAwards(st),ld=getLeaders(st);
+    var ch=st.playoffs&&st.playoffs.champion?st.playoffs.champion:{name:sorted[0].name,color:sorted[0].color};
+    var mv=(aw.mvp||[])[0];
+    if(!st.history)st.history=[];
+    st.history.push({id:Date.now(),date:new Date().toLocaleDateString(),sn:st.seasonNum||1,champ:ch.name,champColor:ch.color,champRec:sorted[0].wins+"-"+sorted[0].losses,mvp:mv?mv.name:"N/A",mvpTeam:mv?mv.teamName:"",awards:aw,leaders:ld,standings:sorted.map(function(t){return{name:t.name,color:t.color,w:t.wins,l:t.losses}})});
+  }
+
+  function nextSeason(){
+    var n=DC(state);
+    var retired=ageAndRetire(n.teams);
+    var draft=runDraft(n.teams,retired.length);
+    // Free agents = undrafted
+    var fa=draft.undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.strengths,p.weakness,p.info)});
+    n.teams.forEach(function(t){t.wins=0;t.losses=0;t.players.forEach(function(p){p.stats=emptyStats();p.injury=null})});
+    n.schedule=genSchedule(n.teams);n.currentDay=1;n.done=false;n.seasonNum=(n.seasonNum||1)+1;
+    n.lastDraft=draft;n.lastRetired=retired;n.freeAgents=fa;n.playoffs=null;n.phase="season";n.headlines=[];
+    if(!n.allRetired)n.allRetired=[];n.allRetired=n.allRetired.concat(retired);
+    sync(n);setView("draft");setSub(null);
+  }
+
+  function signFA(teamIdx,faIdx){
+    var n=DC(state);var fa=n.freeAgents[faIdx];if(!fa)return;
+    n.teams[teamIdx].players.push(makePlayer(fa.name,fa.pos,fa.age,fa.ovr,fa.ht,fa.wt,fa.strengths,fa.weakness,fa.info));
+    n.teams[teamIdx].players.sort(function(a,b){return b.ovr-a.ovr});
+    n.freeAgents.splice(faIdx,1);
+    if(!n.headlines)n.headlines=[];
+    n.headlines.push({type:"trade",text:fa.name+" signs with "+n.teams[teamIdx].name+"!",icon:"\uD83D\uDCDD"});
+    sync(n);
+  }
+
+  function executeTrade(){
+    if(!tradePlayersA.length&&!tradePlayersB.length)return;
+    var n=DC(state);
+    var tA=n.teams[tradeTeamA],tB=n.teams[tradeTeamB];
+    var pA=tradePlayersA.map(function(i){return tA.players[i]});
+    var pB=tradePlayersB.map(function(i){return tB.players[i]});
+    // remove from teams (reverse order)
+    tradePlayersA.slice().sort(function(a,b){return b-a}).forEach(function(i){tA.players.splice(i,1)});
+    tradePlayersB.slice().sort(function(a,b){return b-a}).forEach(function(i){tB.players.splice(i,1)});
+    // add to other teams
+    pA.forEach(function(p){tB.players.push(p)});
+    pB.forEach(function(p){tA.players.push(p)});
+    tA.players.sort(function(a,b){return b.ovr-a.ovr});
+    tB.players.sort(function(a,b){return b.ovr-a.ovr});
+    if(!n.headlines)n.headlines=[];
+    var aNames=pA.map(function(p){return p.name}).join(", ");
+    var bNames=pB.map(function(p){return p.name}).join(", ");
+    n.headlines.push({type:"trade",text:"TRADE: "+tA.name+" sends "+aNames+" to "+tB.name+" for "+bNames,icon:"\uD83D\uDD04"});
+    setTradePlayersA([]);setTradePlayersB([]);
+    sync(n);
+  }
+
+  function resetAll(){if(!confirm("Reset EVERYTHING?"))return;sync(buildInit());setView("today");setSub(null)}
+  function download(){var b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="mdba-save.json";a.click()}
+
+  if(!state)return h("div",{style:{maxWidth:920,margin:"80px auto",textAlign:"center"}},
+    h("div",{style:{fontSize:48,marginBottom:16}},"\uD83C\uDFC0"),
+    h("h1",{style:{color:PRIMARY,marginBottom:8}},"MDBA Season Simulator"),
+    h("p",{style:{color:"#888",animation:"pulse 1.5s infinite"}},"Connecting to server...")
+  );
+
+  // ══════════════════════
+  //  HELPERS
+  // ══════════════════════
+  function dot(c){return h("span",{style:{display:"inline-block",width:10,height:10,borderRadius:"50%",background:c,marginRight:6}})}
+  function ovrBadge(o){return h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:11,fontWeight:700,color:"#fff",background:o>=88?PRIMARY:o>=80?"#e07050":o>=72?"#d4a843":"#999",minWidth:28,textAlign:"center"}},o)}
+  function btn(text,fn,st){return h("button",{style:Object.assign({background:"#fff",color:PRIMARY,border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:14},st||{}),onClick:fn},text)}
+  function btnSm(text,fn,st){return h("button",{style:Object.assign({background:PRIMARY,color:"#fff",border:"none",borderRadius:4,padding:"5px 12px",fontWeight:600,fontSize:12},st||{}),onClick:fn},text)}
+  function tHead(cols){return h("thead",null,h("tr",null,cols.map(function(c){return h("th",{key:c},c)})))}
+  function medal(i){return i===0?"\uD83E\uDD47":i===1?"\uD83E\uDD48":"\uD83E\uDD49"}
+
+  // Player avatar SVG
+  function avatar(name,color,size){
+    var sz=size||36;
+    var initials=(name||"").split(" ").map(function(w){return w[0]}).join("").slice(0,2);
+    return h("div",{style:{width:sz,height:sz,borderRadius:"50%",background:color||"#666",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:sz*0.38,flexShrink:0,border:"2px solid rgba(255,255,255,0.3)"}},initials);
+  }
+
+  // Clickable player name
+  function playerLink(name,teamColor){
+    return h("span",{className:"player-link",onClick:function(e){e.stopPropagation();openPlayerCard(name)}},name);
+  }
+
+  function openPlayerCard(name){
+    var found=null,team=null;
+    state.teams.forEach(function(t){t.players.forEach(function(p){if(p.name===name){found=p;team=t}})});
+    if(found)setModal({type:"player",player:found,team:team});
+  }
+
+  // Injury tag
+  function injTag(p){
+    if(!p.injury||p.injury.games<=0)return null;
+    return h("span",{className:"injured-tag"},p.injury.type.toUpperCase()+" ("+p.injury.games+"G)");
+  }
+
+  // Strength pills
+  function strengthPills(strengths){
+    if(!strengths||!strengths.length)return null;
+    return h("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}},
+      strengths.map(function(s,i){return h("span",{key:i,style:{background:"#e8f5e9",color:"#2e7d32",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}},s)})
+    );
+  }
+
+  var todayGames=state.schedule.filter(function(g){return g.day===state.currentDay});
+  var allDone=todayGames.every(function(g){return g.result});
+
+  // ══════════════════════
+  //  MODAL (Player Card)
+  // ══════════════════════
+  function renderModal(){
+    if(!modal)return null;
+    if(modal.type==="player"){
+      var p=modal.player,t=modal.team;
+      var gp=p.stats.gp;
+      var ovrChange=p.prevOvr?p.ovr-p.prevOvr:0;
+      return h("div",{className:"modal-overlay",onClick:function(){setModal(null)}},
+        h("div",{className:"modal",onClick:function(e){e.stopPropagation()}},
+          h("button",{style:{position:"absolute",top:12,right:16,background:"none",border:"none",fontSize:20,color:"#999"},onClick:function(){setModal(null)}},"\u2715"),
+          h("div",{style:{display:"flex",gap:16,alignItems:"center",marginBottom:20}},
+            avatar(p.name,t?t.color:"#666",72),
+            h("div",null,
+              h("div",{style:{fontSize:22,fontWeight:800,color:"#1a1a2e"}},p.name),
+              h("div",{style:{display:"flex",gap:8,alignItems:"center",marginTop:4}},
+                t?dot(t.color):null,
+                h("span",{style:{fontWeight:600}},t?t.name:""),
+                h("span",{style:{color:"#888"}}," | "+p.pos+" | "+htStr(p.ht)+" | "+wtStr(p.wt)+" | Age "+p.age)
+              )
+            )
+          ),
+          // OVR section
+          h("div",{style:{display:"flex",gap:16,marginBottom:20}},
+            h("div",{style:{textAlign:"center",padding:16,background:"#f8f9fa",borderRadius:12,minWidth:80}},
+              h("div",{style:{fontSize:11,color:"#888",marginBottom:4}},"OVERALL"),
+              ovrBadge(p.ovr),
+              ovrChange!==0?h("div",{style:{fontSize:12,fontWeight:600,marginTop:4,color:ovrChange>0?"#2e7d32":"#c62828"}},ovrChange>0?"+"+ovrChange:ovrChange):null
+            ),
+            p.ovrHistory&&p.ovrHistory.length>1?h("div",{style:{flex:1,padding:16,background:"#f8f9fa",borderRadius:12}},
+              h("div",{style:{fontSize:11,color:"#888",marginBottom:8}},"OVR HISTORY"),
+              h("div",{style:{display:"flex",alignItems:"flex-end",gap:2,height:40}},
+                p.ovrHistory.map(function(o,i){
+                  var pct2=((o-50)/50)*100;
+                  return h("div",{key:i,style:{flex:1,background:o>=85?PRIMARY:o>=75?"#e07050":"#d4a843",height:pct2+"%",borderRadius:2,minHeight:4,position:"relative"},title:"Season "+(i+1)+": "+o});
+                })
+              )
+            ):null
+          ),
+          // Strengths
+          h("div",{style:{marginBottom:16}},
+            h("div",{style:{fontSize:12,fontWeight:700,color:"#888",marginBottom:6,textTransform:"uppercase"}},"Strengths"),
+            strengthPills(p.strengths),
+            p.weakness?h("div",{style:{marginTop:8}},
+              h("span",{style:{background:"#ffebee",color:"#c62828",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}},p.weakness)
+            ):null
+          ),
+          p.info?h("div",{style:{marginBottom:16,padding:12,background:"#fff8e1",borderRadius:8,fontSize:12,fontStyle:"italic",color:"#555"}},'"'+p.info+'"'):null,
+          // Injury
+          p.injury&&p.injury.games>0?h("div",{style:{marginBottom:16,padding:12,background:"#ffebee",borderRadius:8}},
+            h("span",{style:{fontWeight:700,color:"#c62828"}},"\uD83C\uDFE5 INJURED: "),
+            h("span",null,p.injury.type+" ("+p.injury.games+" games remaining)")
+          ):null,
+          // Stats
+          gp>0?h("div",null,
+            h("div",{style:{fontSize:12,fontWeight:700,color:"#888",marginBottom:6,textTransform:"uppercase"}},"Season Averages ("+gp+" GP)"),
+            h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}},
+              [{l:"PPG",v:avg(p.stats.pts,gp)},{l:"RPG",v:avg(p.stats.reb,gp)},{l:"APG",v:avg(p.stats.ast,gp)},{l:"SPG",v:avg(p.stats.stl,gp)},{l:"BPG",v:avg(p.stats.blk,gp)},{l:"FG%",v:pct(p.stats.fgm,p.stats.fga)},{l:"3P%",v:pct(p.stats.tpm,p.stats.tpa)},{l:"MPG",v:avg(p.stats.min,gp)}].map(function(s){
+                return h("div",{key:s.l,style:{textAlign:"center",padding:8,background:"#f8f9fa",borderRadius:8}},
+                  h("div",{style:{fontSize:16,fontWeight:700,color:"#1a1a2e"}},s.v),
+                  h("div",{style:{fontSize:10,color:"#888"}},s.l)
+                );
+              })
+            )
+          ):h("div",{style:{color:"#999",fontSize:13}},"No stats yet this season.")
+        )
+      );
+    }
+    return null;
+  }
+
+  // ══════════════════════
+  //  VIEWS
+  // ══════════════════════
+
+  // HEADLINES
+  function vHeadlines(){
+    var hl=(state.headlines||[]).slice().reverse().slice(0,30);
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"\uD83D\uDCF0 Headlines"),
+      hl.length===0?h("p",{style:{color:"#999"}},"No news yet. Start simming games!"):
+      hl.map(function(x,i){return h("div",{key:i,className:"headline"},h("span",{style:{marginRight:8}},x.icon||""),x.text)})
+    );
+  }
+
+  // TODAY
+  function vToday(){
+    if(state.phase==="playoffs"&&state.playoffs)return vPlayoffs();
+    if(state.phase==="offseason")return vOffseason();
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},state.done?"Regular Season Complete":"Day "+state.currentDay),
+      state.done&&!state.playoffs?h("div",{style:{textAlign:"center",padding:30}},
+        h("div",{style:{fontSize:48,marginBottom:12}},"\uD83C\uDFC6"),
+        h("div",{style:{fontSize:18,fontWeight:700,color:PRIMARY,marginBottom:16}},"The playoffs are set!"),
+        h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:function(){var n=DC(state);n.phase="playoffs";n.playoffs=initPlayoffs(n.teams);sync(n)}},"Start Playoffs \u2192")
+      ):
+      h("div",null,
+        todayGames.map(function(g,i){
+          var aw=state.teams[g.away],hm=state.teams[g.home],idx=state.schedule.indexOf(g),pl=!!g.result;
+          return h("div",{key:i,style:{padding:"12px 16px",background:i%2===0?"#fff":"#f8f9fa",borderRadius:8,marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid #eee"}},
+            h("div",{style:{display:"flex",alignItems:"center",gap:6,fontSize:14}},
+              avatar(aw.name,aw.color,24),h("span",{style:{fontWeight:500}},aw.name),
+              h("span",{style:{color:"#bbb",margin:"0 6px"}},"@"),
+              avatar(hm.name,hm.color,24),h("span",{style:{fontWeight:500}},hm.name)
+            ),
+            pl?h("div",{style:{display:"flex",alignItems:"center",gap:10}},
+              h("span",{style:{fontWeight:700,fontSize:15}},g.result.awayScore+" - "+g.result.homeScore),
+              btnSm("Box Score",function(){setSub({t:"box",d:idx})})
+            ):h("button",{style:{background:"#28a745",color:"#fff",border:"none",borderRadius:6,padding:"6px 16px",fontWeight:700,fontSize:13,cursor:"pointer"},onClick:function(){simIdx(idx)}},"\u25B6 Sim")
+          );
+        }),
+        allDone&&!state.done?h("div",{style:{textAlign:"center",marginTop:20}},
+          h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"12px 28px",fontWeight:700,fontSize:15,cursor:"pointer"},onClick:advDay},"Advance to Day "+(state.currentDay+1)+" \u2192")
+        ):null
+      )
+    );
+  }
+
+  // PLAYOFFS
+  function vPlayoffs(){
+    var po=state.playoffs;if(!po)return h("div",{className:"card"},h("p",null,"No playoff data"));
+    function seriesCard(mu,idx,isFinals){
+      var done=mu.hWins>=4||mu.lWins>=4;
+      var winner=done?(mu.hWins>=4?mu.hName:mu.lName):null;
+      return h("div",{style:{padding:16,background:winner?"linear-gradient(135deg,#fff8e1,#ffe082)":"#f8f9fa",borderRadius:12,marginBottom:12,border:winner?"2px solid "+PRIMARY:"1px solid #eee"}},
+        h("div",{style:{textAlign:"center",marginBottom:12}},h("span",{style:{fontWeight:700,fontSize:14,color:PRIMARY}},isFinals?"FINALS":"SEMIFINAL "+(idx+1))),
+        h("div",{style:{display:"flex",justifyContent:"center",alignItems:"center",gap:20,marginBottom:12}},
+          h("div",{style:{textAlign:"center"}},avatar(mu.hName,mu.hColor,40),h("div",{style:{fontWeight:600,fontSize:13,marginTop:4}},mu.hName),h("div",{style:{fontSize:24,fontWeight:800,color:mu.hWins>=4?PRIMARY:"#333"}},mu.hWins)),
+          h("div",{style:{fontSize:14,color:"#999"}},"vs"),
+          h("div",{style:{textAlign:"center"}},avatar(mu.lName,mu.lColor,40),h("div",{style:{fontWeight:600,fontSize:13,marginTop:4}},mu.lName),h("div",{style:{fontSize:24,fontWeight:800,color:mu.lWins>=4?PRIMARY:"#333"}},mu.lWins))
+        ),
+        done?h("div",{style:{textAlign:"center",fontWeight:700,color:PRIMARY}},winner+" wins the series!"):
+        h("div",{style:{textAlign:"center"}},h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:14,cursor:"pointer"},onClick:function(){simPlayoffGameAction(idx)}},"\u25B6 Sim Game "+(mu.games.length+1)))
+      );
+    }
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"\uD83C\uDFC6 Playoffs"+(po.champion?" - "+po.champion.name+" are CHAMPIONS!":"")),
+      po.champion?h("div",{style:{textAlign:"center",padding:20,marginBottom:16}},
+        h("div",{style:{fontSize:60,marginBottom:8}},"\uD83C\uDFC6"),
+        h("div",{style:{fontSize:24,fontWeight:800,color:PRIMARY}},po.champion.name),
+        h("div",{style:{fontSize:14,color:"#666",marginTop:8}},"MDBA Champions - Season "+state.seasonNum),
+        h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Start Next Season \u2192")
+      ):null,
+      po.round==="finals"&&po.finals?h("div",null,
+        seriesCard(po.finals,0,true),
+        h("h3",{style:{marginBottom:8,marginTop:20,fontSize:14,color:"#888"}},"SEMIFINALS"),
+        po.matchups.map(function(m,i){return seriesCard(m,i,false)})
+      ):h("div",null,
+        h("h3",{style:{marginBottom:8,fontSize:14,color:"#888"}},"SEMIFINALS"),
+        po.matchups.map(function(m,i){return seriesCard(m,i,false)})
+      )
+    );
+  }
+
+  // OFFSEASON
+  function vOffseason(){
+    return h("div",{className:"card",style:{textAlign:"center",padding:40}},
+      h("div",{style:{fontSize:48,marginBottom:12}},"\uD83C\uDFC6"),
+      h("div",{style:{fontSize:20,fontWeight:700,color:PRIMARY,marginBottom:16}},"Season "+state.seasonNum+" Complete!"),
+      h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:nextSeason},"Start Next Season \u2192"),
+      h("div",{style:{fontSize:12,color:"#999",marginTop:8}},"Ages players, retires veterans, runs the draft")
+    );
+  }
+
+  // STANDINGS
+  function vStandings(){
+    var sorted=state.teams.slice().sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins});
+    var tw=sorted[0]?sorted[0].wins:0,tl=sorted[0]?sorted[0].losses:0;
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:12,color:PRIMARY,fontSize:18}},"Standings"),
+      h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["#","TEAM","AVG OVR","W","L","PCT","GB"]),
+        h("tbody",null,sorted.map(function(t,i){
+          var gp=t.wins+t.losses,wp=gp>0?(t.wins/gp).toFixed(3):".000";
+          var gb=gp>0?((tw-tl-t.wins+t.losses)/2):0;
+          var avgOvr=Math.round(t.players.reduce(function(s,p){return s+p.ovr},0)/t.players.length);
+          return h("tr",{key:t.name,style:{cursor:"pointer",background:i<4?"#f0fff0":i%2===0?"#fff":"#fafafa"},onClick:function(){setSub({t:"team",d:t.name})}},
+            h("td",{style:{padding:"8px 6px",fontWeight:700,color:PRIMARY}},i+1),
+            h("td",{style:{padding:"8px 6px"}},h("div",{style:{display:"flex",alignItems:"center",gap:8}},avatar(t.name,t.color,28),h("span",{style:{fontWeight:600}},t.name))),
+            h("td",{style:{padding:"8px 6px"}},ovrBadge(avgOvr)),
+            h("td",{style:{padding:"8px 6px",fontWeight:700,fontSize:14}},t.wins),
+            h("td",{style:{padding:"8px 6px"}},t.losses),
+            h("td",{style:{padding:"8px 6px",fontWeight:600}},wp),
+            h("td",{style:{padding:"8px 6px"}},gb===0?"-":gb.toFixed(1))
+          );
+        }))
+      )),
+      h("div",{style:{fontSize:11,color:"#888",marginTop:8}},"Top 4 teams (highlighted) make the playoffs")
+    );
+  }
+
+  // TEAM DETAIL
+  function vTeam(name){
+    var team=state.teams.find(function(t){return t.name===name});if(!team)return h("div",null,"Not found");
+    return h("div",{className:"card"},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:20,flexWrap:"wrap"}},
+        btnSm("\u2190 Back",function(){setSub(null)}),avatar(team.name,team.color,48),
+        h("div",null,h("h2",{style:{color:PRIMARY,fontSize:20}},team.name),h("div",{style:{fontSize:14,fontWeight:600}},team.wins+"-"+team.losses))
+      ),
+      h("div",{style:{overflowX:"auto"}},h("table",null,
+        tHead(["","PLAYER","POS","OVR","\u0394","HT","WT","AGE","GP","PPG","RPG","APG","SPG","BPG","FG%","MPG"]),
+        h("tbody",null,team.players.map(function(p,i){
+          var gp=p.stats.gp,ch=p.prevOvr?p.ovr-p.prevOvr:0;
+          return h("tr",{key:p.name,style:{background:i%2===0?"#fff":"#fafafa",borderTop:i===5?"3px solid "+PRIMARY:"none"}},
+            h("td",{style:{padding:"6px"}},avatar(p.name,team.color,28)),
+            h("td",{style:{padding:"6px"}},playerLink(p.name,team.color),injTag(p),strengthPills(p.strengths)),
+            h("td",{style:{padding:"6px"}},p.pos),
+            h("td",{style:{padding:"6px"}},ovrBadge(p.ovr)),
+            h("td",{style:{padding:"6px",color:ch>0?"#2e7d32":ch<0?"#c62828":"#999",fontWeight:600,fontSize:11}},ch>0?"+"+ch:ch<0?""+ch:"-"),
+            h("td",{style:{padding:"6px",fontSize:11}},htStr(p.ht)),
+            h("td",{style:{padding:"6px",fontSize:11}},wtStr(p.wt)),
+            h("td",{style:{padding:"6px"}},p.age),
+            h("td",{style:{padding:"6px"}},gp),
+            h("td",{style:{padding:"6px",fontWeight:600}},avg(p.stats.pts,gp)),
+            h("td",{style:{padding:"6px"}},avg(p.stats.reb,gp)),
+            h("td",{style:{padding:"6px"}},avg(p.stats.ast,gp)),
+            h("td",{style:{padding:"6px"}},avg(p.stats.stl,gp)),
+            h("td",{style:{padding:"6px"}},avg(p.stats.blk,gp)),
+            h("td",{style:{padding:"6px"}},pct(p.stats.fgm,p.stats.fga)+"%"),
+            h("td",{style:{padding:"6px"}},avg(p.stats.min,gp))
+          );
+        }))
+      ))
+    );
+  }
+
+  // BOX SCORE
+  function vBox(gi){
+    var g=state.schedule[gi];if(!g||!g.result)return h("div",null,"No data");
+    var ht=state.teams[g.home],at=state.teams[g.away],r=g.result;
+    function teamBox(nm,col,stats,isW){
+      var s=stats.slice().sort(function(a,b){return a.ri-b.ri});
+      var tot={min:0,pts:0,reb:0,ast:0,stl:0,blk:0,to:0,pf:0,fgm:0,fga:0,tpm:0,tpa:0,ftm:0,fta:0};
+      s.forEach(function(p){for(var k in tot)tot[k]+=p[k]});
+      var rows=s.map(function(p,i){
+        var hl=p.pts>=20?{color:PRIMARY,fontWeight:700}:{};
+        return h("tr",{key:p.name,style:{background:i%2===0?"#fff":"#fafafa",borderTop:i===5?"3px solid "+PRIMARY:"none"}},
+          h("td",{style:Object.assign({padding:"7px 6px"},hl)},playerLink(p.name,col)),
+          h("td",{style:{padding:"7px 6px"}},ovrBadge(p.ovr)),
+          h("td",{style:{padding:"7px 6px",fontSize:11}},htStr(p.ht)),
+          h("td",{style:{padding:"7px 6px"}},p.min),
+          h("td",{style:Object.assign({padding:"7px 6px",fontWeight:700},hl)},p.pts),
+          h("td",{style:{padding:"7px 6px"}},p.reb),h("td",{style:{padding:"7px 6px"}},p.ast),
+          h("td",{style:{padding:"7px 6px"}},p.stl),h("td",{style:{padding:"7px 6px"}},p.blk),
+          h("td",{style:{padding:"7px 6px"}},p.to),h("td",{style:{padding:"7px 6px"}},p.fgm+"/"+p.fga),
+          h("td",{style:{padding:"7px 6px"}},p.tpm+"/"+p.tpa),h("td",{style:{padding:"7px 6px"}},p.ftm+"/"+p.fta)
+        );
+      });
+      rows.push(h("tr",{key:"tot",style:{background:"#e8e8e8",fontWeight:700}},
+        h("td",{style:{padding:"7px 6px"}},"TOTALS"),h("td",null,""),h("td",null,""),h("td",null,""),
+        h("td",{style:{padding:"7px 6px"}},tot.pts),h("td",{style:{padding:"7px 6px"}},tot.reb),
+        h("td",{style:{padding:"7px 6px"}},tot.ast),h("td",{style:{padding:"7px 6px"}},tot.stl),
+        h("td",{style:{padding:"7px 6px"}},tot.blk),h("td",{style:{padding:"7px 6px"}},tot.to),
+        h("td",{style:{padding:"7px 6px"}},tot.fgm+"/"+tot.fga),h("td",{style:{padding:"7px 6px"}},tot.tpm+"/"+tot.tpa),
+        h("td",{style:{padding:"7px 6px"}},tot.ftm+"/"+tot.fta)));
+      return h("div",{style:{marginBottom:20}},
+        h("h3",{style:{marginBottom:8,fontSize:15,display:"flex",alignItems:"center",gap:8}},avatar(nm,col,24),nm,isW?" (W)":" (L)"),
+        h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["PLAYER","OVR","HT","MIN","PTS","REB","AST","STL","BLK","TO","FG","3PT","FT"]),h("tbody",null,rows)))
+      );
+    }
+    return h("div",{className:"card"},
+      btnSm("\u2190 Back",function(){setSub(null)}),
+      h("div",{style:{textAlign:"center",margin:"16px 0",padding:20,background:"linear-gradient(135deg,#f8f9fa,#e9ecef)",borderRadius:12}},
+        h("div",{style:{display:"flex",justifyContent:"center",alignItems:"center",gap:40}},
+          h("div",null,avatar(at.name,at.color,36),h("div",{style:{fontSize:13,fontWeight:600,marginTop:4}},at.name),h("div",{style:{fontSize:42,fontWeight:800,color:r.awayScore>r.homeScore?PRIMARY:"#aaa"}},r.awayScore)),
+          h("div",{style:{fontSize:20,color:"#bbb"}},"@"),
+          h("div",null,avatar(ht.name,ht.color,36),h("div",{style:{fontSize:13,fontWeight:600,marginTop:4}},ht.name),h("div",{style:{fontSize:42,fontWeight:800,color:r.homeScore>r.awayScore?PRIMARY:"#aaa"}},r.homeScore))
+        )
+      ),
+      teamBox(at.name,at.color,r.awayStats,r.awayScore>r.homeScore),
+      teamBox(ht.name,ht.color,r.homeStats,r.homeScore>r.awayScore)
+    );
+  }
+
+  // SCHEDULE (compact)
+  function vSchedule(){
+    var days=[];var seen={};state.schedule.forEach(function(g){if(!seen[g.day]){seen[g.day]=true;days.push(g.day)}});
+    days.sort(function(a,b){return a-b});var pp=10,tp=Math.ceil(days.length/pp),pd=days.slice(sPage*pp,(sPage+1)*pp);
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:12,color:PRIMARY,fontSize:18}},"Schedule"),
+      h("div",{style:{display:"flex",gap:8,marginBottom:12,alignItems:"center"}},
+        btnSm("\u2190",function(){setSPage(Math.max(0,sPage-1))}),h("span",{style:{fontSize:13}},"Page "+(sPage+1)+"/"+tp),btnSm("\u2192",function(){setSPage(Math.min(tp-1,sPage+1))})
+      ),
+      pd.map(function(day){return h("div",{key:day,style:{marginBottom:14}},
+        h("div",{style:{fontSize:11,fontWeight:700,color:"#888",marginBottom:4,textTransform:"uppercase",letterSpacing:1}},"Day "+day),
+        state.schedule.filter(function(g){return g.day===day}).map(function(g,i){
+          var aw=state.teams[g.away],hm=state.teams[g.home],idx=state.schedule.indexOf(g),pl=!!g.result;
+          return h("div",{key:i,style:{padding:"6px 10px",background:pl?"#f8f9fa":"#fff",borderRadius:6,marginBottom:2,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:pl?"pointer":"default",border:"1px solid #eee",fontSize:13},onClick:pl?function(){setSub({t:"box",d:idx})}:undefined},
+            h("span",null,dot(aw.color),h("span",{style:pl&&g.result.awayScore>g.result.homeScore?{fontWeight:700,color:PRIMARY}:{}},aw.name),h("span",{style:{margin:"0 6px",color:"#999"}},"@"),dot(hm.color),h("span",{style:pl&&g.result.homeScore>g.result.awayScore?{fontWeight:700,color:PRIMARY}:{}},hm.name)),
+            pl?h("span",{style:{fontWeight:700}},g.result.awayScore+" - "+g.result.homeScore):h("span",{style:{color:"#ccc"}},"TBD")
+          );
+        })
+      )})
+    );
+  }
+
+  // LEADERS
+  function vLeaders(){
+    var cats=[{k:"pts",l:"Scoring"},{k:"reb",l:"Rebounds"},{k:"ast",l:"Assists"},{k:"stl",l:"Steals"},{k:"blk",l:"Blocks"}];
+    var all=[];state.teams.forEach(function(t){t.players.forEach(function(p){if(p.stats.gp>=1)all.push(Object.assign({},p,{teamName:t.name,teamColor:t.color}))})});
+    var sorted=all.slice().sort(function(a,b){return(b.stats[lCat]/b.stats.gp)-(a.stats[lCat]/a.stats.gp)}).slice(0,20);
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:12,color:PRIMARY,fontSize:18}},"League Leaders"),
+      h("div",{style:{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}},cats.map(function(c){return h("button",{key:c.k,className:"pill",style:{background:lCat===c.k?PRIMARY:"#e8e8e8",color:lCat===c.k?"#fff":"#333"},onClick:function(){setLCat(c.k)}},c.l)})),
+      h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["#","PLAYER","TEAM","OVR","HT","POS","GP","PER GAME"]),
+        h("tbody",null,sorted.map(function(p,i){
+          return h("tr",{key:p.name+p.teamName,style:{background:i<3?"#fff5f5":i%2===0?"#fff":"#fafafa"}},
+            h("td",{style:{padding:"8px 6px",fontWeight:i<3?700:400,color:i<3?PRIMARY:"#333"}},i+1),
+            h("td",{style:{padding:"8px 6px"}},h("div",{style:{display:"flex",alignItems:"center",gap:6}},avatar(p.name,p.teamColor,24),playerLink(p.name,p.teamColor))),
+            h("td",{style:{padding:"8px 6px"}},dot(p.teamColor),p.teamName),
+            h("td",{style:{padding:"8px 6px"}},ovrBadge(p.ovr)),
+            h("td",{style:{padding:"8px 6px",fontSize:11}},htStr(p.ht)),
+            h("td",{style:{padding:"8px 6px"}},p.pos),
+            h("td",{style:{padding:"8px 6px"}},p.stats.gp),
+            h("td",{style:{padding:"8px 6px",fontWeight:700,fontSize:14,color:i<3?PRIMARY:"#333"}},avg(p.stats[lCat],p.stats.gp))
+          );
+        }))
+      ))
+    );
+  }
+
+  // ALL PLAYERS
+  function vPlayers(){
+    var all=[];state.teams.forEach(function(t){t.players.forEach(function(p){all.push(Object.assign({},p,{teamName:t.name,teamColor:t.color}))})});
+    all.sort(function(a,b){
+      var av,bv,k=pSort,d=pDir;
+      if(k==="name"){av=a.name;bv=b.name;return d?(av<bv?-1:1):(bv<av?-1:1)}
+      if(k==="team"){av=a.teamName;bv=b.teamName;return d?(av<bv?-1:1):(bv<av?-1:1)}
+      var map={ovr:"ovr",age:"age",ht:"ht",wt:"wt",ppg:function(x){return x.stats.gp?x.stats.pts/x.stats.gp:0},rpg:function(x){return x.stats.gp?x.stats.reb/x.stats.gp:0},apg:function(x){return x.stats.gp?x.stats.ast/x.stats.gp:0},spg:function(x){return x.stats.gp?x.stats.stl/x.stats.gp:0},bpg:function(x){return x.stats.gp?x.stats.blk/x.stats.gp:0}};
+      var fn=map[k];if(typeof fn==="function"){av=fn(a);bv=fn(b)}else{av=a[fn||"ovr"];bv=b[fn||"ovr"]}
+      return d?bv-av:av-bv;
+    });
+    function sBtn(label,key){var active=pSort===key;return h("th",{key:key,style:{background:active?"#333":"#1a1a2e",color:"#fff",padding:"8px 6px",cursor:"pointer",fontSize:11},onClick:function(){if(pSort===key)setPDir(!pDir);else{setPSort(key);setPDir(true)}}},label+(active?(pDir?" \u25BC":" \u25B2"):""))}
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:12,color:PRIMARY,fontSize:18}},"All Players ("+all.length+")"),
+      h("div",{style:{overflowX:"auto"}},h("table",null,
+        h("thead",null,h("tr",null,sBtn("PLAYER","name"),sBtn("TEAM","team"),h("th",{key:"pos"},"POS"),sBtn("OVR","ovr"),h("th",{key:"d"},"\u0394"),sBtn("HT","ht"),sBtn("WT","wt"),sBtn("AGE","age"),sBtn("PPG","ppg"),sBtn("RPG","rpg"),sBtn("APG","apg"),sBtn("SPG","spg"),sBtn("BPG","bpg"))),
+        h("tbody",null,all.map(function(p,i){
+          var gp=p.stats.gp,ch=p.prevOvr?p.ovr-p.prevOvr:0;
+          return h("tr",{key:p.name+p.teamName,style:{background:i%2===0?"#fff":"#fafafa"}},
+            h("td",{style:{padding:"6px"}},h("div",{style:{display:"flex",alignItems:"center",gap:6}},avatar(p.name,p.teamColor,24),playerLink(p.name,p.teamColor),injTag(p))),
+            h("td",{style:{padding:"6px",fontSize:12}},dot(p.teamColor),p.teamName),
+            h("td",{style:{padding:"6px"}},p.pos),h("td",{style:{padding:"6px"}},ovrBadge(p.ovr)),
+            h("td",{style:{padding:"6px",color:ch>0?"#2e7d32":ch<0?"#c62828":"#999",fontWeight:600,fontSize:11}},ch>0?"+"+ch:ch<0?""+ch:"-"),
+            h("td",{style:{padding:"6px",fontSize:11}},htStr(p.ht)),h("td",{style:{padding:"6px",fontSize:11}},p.wt),
+            h("td",{style:{padding:"6px"}},p.age),
+            h("td",{style:{padding:"6px",fontWeight:600}},avg(p.stats.pts,gp)),h("td",{style:{padding:"6px"}},avg(p.stats.reb,gp)),
+            h("td",{style:{padding:"6px"}},avg(p.stats.ast,gp)),h("td",{style:{padding:"6px"}},avg(p.stats.stl,gp)),h("td",{style:{padding:"6px"}},avg(p.stats.blk,gp))
+          );
+        }))
+      ))
+    );
+  }
+
+  // AWARDS
+  function vAwards(){
+    var aw=getAwards(state),ld=getLeaders(state);
+    var cats=[{k:"mvp",l:"MVP"},{k:"dpoy",l:"DPOY"},{k:"smoy",l:"Sixth Man"},{k:"mip",l:"Most Improved"},{k:"roy",l:"ROY"}];
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"Season Awards"),
+      cats.map(function(cat){
+        var c=aw[cat.k]||[];if(!c.length)return h("div",{key:cat.k,style:{marginBottom:16}},h("h3",{style:{fontSize:14}},cat.l),h("p",{style:{color:"#999",fontSize:13}},"No eligible"));
+        return h("div",{key:cat.k,style:{marginBottom:24}},h("h3",{style:{marginBottom:10,fontSize:15}},cat.l),
+          c.map(function(p,i){var gp=p.stats.gp;return h("div",{key:p.name,style:i===0?{background:"linear-gradient(135deg,#fff8e1,#ffe082)",border:"2px solid "+PRIMARY,borderRadius:10,padding:14,marginBottom:8}:{padding:"10px 14px",background:"#f8f9fa",borderRadius:8,marginBottom:4}},
+            h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},
+              h("div",{style:{display:"flex",alignItems:"center",gap:8}},avatar(p.name,p.teamColor,i===0?36:28),h("span",{style:{fontWeight:700,fontSize:i===0?16:14}},""+(i+1)+". "),playerLink(p.name),ovrBadge(p.ovr),h("span",{style:{fontSize:12,color:"#666"}},p.pos+" | "+htStr(p.ht))),
+              h("span",{style:{fontSize:12,color:"#555"}},avg(p.stats.pts,gp)+" PPG | "+avg(p.stats.reb,gp)+" RPG | "+avg(p.stats.ast,gp)+" APG")
+            ))})
+        );
+      }),
+      h("h2",{style:{marginBottom:16,marginTop:24,color:PRIMARY,fontSize:18}},"Stat Champions"),
+      ["pts","reb","ast","stl","blk"].map(function(cat){
+        var top3=(ld[cat]||[]).slice(0,3);var label={pts:"Scoring",reb:"Rebounds",ast:"Assists",stl:"Steals",blk:"Blocks"}[cat];
+        return h("div",{key:cat,style:{marginBottom:14}},h("h4",{style:{fontSize:13,color:"#555",marginBottom:6}},label),
+          top3.map(function(p,i){return h("div",{key:p.name,style:{fontSize:13,padding:"3px 0",display:"flex",alignItems:"center",gap:6}},medal(i),playerLink(p.name)," (",p.teamName,") ",h("span",{style:{fontWeight:700,color:PRIMARY}},avg(p.stats[cat],p.stats.gp)+"/g"))}));
+      })
+    );
+  }
+
+  // DRAFT
+  function vDraft(){
+    var draft=state.lastDraft,ret=state.lastRetired;
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"\uD83C\uDFC0 Season "+state.seasonNum+" Offseason"),
+      ret&&ret.length>0?h("div",{style:{marginBottom:24}},
+        h("h3",{style:{marginBottom:10,fontSize:15,color:"#c62828"}},"\uD83D\uDC4B Retired ("+ret.length+")"),
+        ret.map(function(p){return h("div",{key:p.name,style:{padding:"10px 14px",background:"#fafafa",borderRadius:8,marginBottom:4,display:"flex",alignItems:"center",gap:8,border:"1px solid #eee"}},
+          avatar(p.name,p.teamColor,28),h("span",{style:{fontWeight:700}},p.name),ovrBadge(p.ovr),h("span",{style:{fontSize:12,color:"#888"}},p.pos+" | "+htStr(p.ht)+" | Age "+p.age+" | "+p.team))})
+      ):null,
+      draft?h("div",null,h("h3",{style:{marginBottom:12,fontSize:16}},"Draft Results"),
+        draft.picks.map(function(p){return h("div",{key:p.pick,style:{padding:"12px 16px",background:p.pick===1?"linear-gradient(135deg,#fff8e1,#ffe082)":p.pick%2===0?"#f8f9fa":"#fff",borderRadius:10,marginBottom:6,border:p.pick===1?"2px solid "+PRIMARY:"1px solid #eee"}},
+          h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}},
+            h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+              h("span",{style:{fontWeight:800,color:PRIMARY,fontSize:16,minWidth:30}},"#"+p.pick),
+              avatar(p.player.name,p.teamColor,32),dot(p.teamColor),h("span",{style:{fontWeight:600}},p.team),
+              h("span",{style:{fontWeight:700,fontSize:15}},p.player.name),ovrBadge(p.player.ovr),
+              h("span",{style:{fontSize:12,color:"#666"}},p.player.pos+" | "+htStr(p.player.ht)+" | "+wtStr(p.player.wt)+" | Age "+p.player.age)
+            ),
+            h("span",{style:{fontSize:12,color:"#555",fontStyle:"italic",maxWidth:350}},p.player.info)
+          ))})
+      ):h("p",{style:{color:"#999"}},"Complete a season to see draft data.")
+    );
+  }
+
+  // FREE AGENCY
+  function vFreeAgency(){
+    var fa=state.freeAgents||[];
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"\uD83D\uDCDD Free Agency ("+fa.length+" available)"),
+      fa.length===0?h("p",{style:{color:"#999"}},"No free agents available."):
+      fa.map(function(p,fi){return h("div",{key:p.name,style:{padding:"12px 16px",background:fi%2===0?"#fff":"#f8f9fa",borderRadius:8,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,border:"1px solid #eee"}},
+        h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+          avatar(p.name,"#666",32),h("span",{style:{fontWeight:700}},p.name),ovrBadge(p.ovr),
+          h("span",{style:{fontSize:12,color:"#666"}},p.pos+" | "+htStr(p.ht)+" | "+wtStr(p.wt)+" | Age "+p.age),
+          strengthPills(p.strengths)
+        ),
+        h("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},
+          state.teams.map(function(t,ti){return h("button",{key:ti,style:{background:t.color,color:"#fff",border:"none",borderRadius:4,padding:"3px 8px",fontSize:10,fontWeight:600,cursor:"pointer"},onClick:function(){signFA(ti,fi)}},t.name.split(" ").pop())})
+        )
+      )})
+    );
+  }
+
+  // TRADES
+  function vTrades(){
+    var tA=state.teams[tradeTeamA]||state.teams[0],tB=state.teams[tradeTeamB]||state.teams[1];
+    function teamSelect(val,setter){
+      return h("select",{value:val,onChange:function(e){setter(parseInt(e.target.value));if(val===tradeTeamA)setTradePlayersA([]);else setTradePlayersB([])},style:{padding:"8px 12px",borderRadius:6,border:"1px solid #ddd",fontSize:14,fontWeight:600}},
+        state.teams.map(function(t,i){return h("option",{key:i,value:i},t.name)}));
+    }
+    function playerList(team,selected,setSelected){
+      return team.players.map(function(p,i){
+        var isSel=selected.indexOf(i)>=0;
+        return h("div",{key:p.name,style:{padding:"8px 12px",background:isSel?"#ffebee":"#f8f9fa",borderRadius:6,marginBottom:3,cursor:"pointer",border:isSel?"2px solid "+PRIMARY:"1px solid #eee",display:"flex",alignItems:"center",gap:8},onClick:function(){if(isSel)setSelected(selected.filter(function(x){return x!==i}));else setSelected(selected.concat([i]))}},
+          avatar(p.name,team.color,24),h("span",{style:{fontWeight:600,fontSize:13}},p.name),ovrBadge(p.ovr),h("span",{style:{fontSize:11,color:"#888"}},p.pos+" | Age "+p.age)
+        );
+      });
+    }
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"\uD83D\uDD04 Trade Machine"),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:16,alignItems:"start"}},
+        h("div",null,teamSelect(tradeTeamA,setTradeTeamA),h("div",{style:{marginTop:12}},playerList(tA,tradePlayersA,setTradePlayersA))),
+        h("div",{style:{textAlign:"center",paddingTop:40}},
+          h("div",{style:{fontSize:24}},"\u21C4"),
+          h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:12},onClick:executeTrade},"Execute Trade")
+        ),
+        h("div",null,teamSelect(tradeTeamB,setTradeTeamB),h("div",{style:{marginTop:12}},playerList(tB,tradePlayersB,setTradePlayersB)))
+      )
+    );
+  }
+
+  // POWER RANKINGS
+  function vPower(){
+    var ranked=getPowerRankings(state);
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:12,color:PRIMARY,fontSize:18}},"\uD83D\uDCCA Power Rankings"),
+      ranked.map(function(t,i){
+        var avgOvr=Math.round(t.players.reduce(function(s,p){return s+p.ovr},0)/t.players.length);
+        var topPlayer=t.players[0];
+        return h("div",{key:t.name,style:{padding:"14px 16px",background:i===0?"linear-gradient(135deg,#fff8e1,#ffe082)":i%2===0?"#fff":"#f8f9fa",borderRadius:10,marginBottom:6,border:i===0?"2px solid "+PRIMARY:"1px solid #eee",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",cursor:"pointer"},onClick:function(){setSub({t:"team",d:t.name})}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:12}},
+            h("span",{style:{fontWeight:800,fontSize:20,color:PRIMARY,minWidth:30}},i+1),
+            avatar(t.name,t.color,36),
+            h("div",null,h("div",{style:{fontWeight:700,fontSize:15}},t.name),h("div",{style:{fontSize:12,color:"#888"}},t.wins+"-"+t.losses+" | Avg OVR: "+avgOvr))
+          ),
+          h("div",{style:{fontSize:12,color:"#666",textAlign:"right"}},
+            h("div",null,"Best: "+topPlayer.name+" ("+topPlayer.ovr+")"),
+            h("div",{style:{color:"#888"}},t.players.filter(function(p){return p.injury&&p.injury.games>0}).length+" injured")
+          )
+        );
+      })
+    );
+  }
+
+  // RETIRED
+  function vRetired(){
+    var all=state.allRetired||[];
+    return h("div",{className:"card"},
+      h("h2",{style:{marginBottom:16,color:PRIMARY,fontSize:18}},"Retired Players ("+all.length+")"),
+      all.length===0?h("p",{style:{color:"#999"}},"No retirements yet."):
+      h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["","PLAYER","POS","OVR","HT","WT","AGE","STRENGTHS","LAST TEAM"]),
+        h("tbody",null,all.map(function(p,i){
+          return h("tr",{key:p.name+i,style:{background:i%2===0?"#fff":"#fafafa"}},
+            h("td",{style:{padding:"6px"}},avatar(p.name,p.teamColor,24)),
+            h("td",{style:{padding:"6px",fontWeight:600}},p.name),h("td",{style:{padding:"6px"}},p.pos),
+            h("td",{style:{padding:"6px"}},ovrBadge(p.ovr)),h("td",{style:{padding:"6px",fontSize:11}},htStr(p.ht||75)),
+            h("td",{style:{padding:"6px",fontSize:11}},p.wt||210),h("td",{style:{padding:"6px"}},p.age),
+            h("td",{style:{padding:"6px"}},strengthPills(p.strengths)),
+            h("td",{style:{padding:"6px"}},dot(p.teamColor),p.team)
+          );
+        }))
+      ))
+    );
+  }
+
+  // HISTORY
+  function vHistory(){
+    var hist=state.history||[];
+    return h("div",{className:"card"},
+      h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+        h("h2",{style:{color:PRIMARY,fontSize:18}},"Season History"),
+        hist.length>0?(cda?h("div",{style:{display:"flex",gap:4}},
+          btnSm("Confirm",function(){var n=DC(state);n.history=[];sync(n);setCda(false)},{background:"#dc3545"}),btnSm("Cancel",function(){setCda(false)})
+        ):btnSm("Delete All",function(){setCda(true)},{background:"#dc3545"})):null
+      ),
+      hist.length===0?h("p",{style:{color:"#999"}},"No completed seasons yet."):
+      hist.map(function(s,si){return h("div",{key:s.id,style:{marginBottom:12,background:"#f8f9fa",borderRadius:10,padding:14,border:"1px solid #eee"}},
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",flexWrap:"wrap",gap:8},onClick:function(){setExp(exp===si?null:si)}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+            h("span",{style:{fontWeight:800,fontSize:15,color:PRIMARY}},"Season "+(s.sn||si+1)),
+            h("span",{style:{fontSize:24}},"\uD83C\uDFC6"),dot(s.champColor),h("span",{style:{fontWeight:600}},s.champ),
+            h("span",{style:{fontSize:12,color:"#888"}},"MVP: "+s.mvp),h("span",{style:{fontSize:11,color:"#bbb"}},s.date)
+          ),
+          cd===s.id?h("div",{style:{display:"flex",gap:4}},
+            btnSm("Confirm",function(e){e.stopPropagation();var n=DC(state);n.history=n.history.filter(function(x){return x.id!==s.id});sync(n);setCd(null)},{background:"#dc3545"}),
+            btnSm("Cancel",function(e){e.stopPropagation();setCd(null)})
+          ):btnSm("Delete",function(e){e.stopPropagation();setCd(s.id)},{background:"#dc3545"})
+        ),
+        exp===si?h("div",{style:{marginTop:12}},
+          h("h4",{style:{marginBottom:8,fontSize:12,color:"#888",textTransform:"uppercase"}},"Final Standings"),
+          (s.standings||[]).map(function(t,i){return h("div",{key:t.name,style:{fontSize:13,padding:"3px 0"}},""+(i+1)+". ",dot(t.color),t.name+" ("+t.w+"-"+t.l+")")}),
+          s.awards?h("div",{style:{marginTop:12}},
+            ["mvp","dpoy","smoy","mip","roy"].map(function(k){var label={mvp:"MVP",dpoy:"DPOY",smoy:"6MOY",mip:"MIP",roy:"ROY"}[k];var w=(s.awards[k]||[])[0];return w?h("div",{key:k,style:{fontSize:13}},h("span",{style:{fontWeight:600}},label+": "),w.name):null})
+          ):null
+        ):null
+      )})
+    );
+  }
+
+  // ══════════════════════
+  //  MAIN LAYOUT
+  // ══════════════════════
+  var tabs=[
+    {k:"today",l:state.phase==="playoffs"?"Playoffs":state.phase==="offseason"?"Offseason":"Today"},
+    {k:"headlines",l:"\uD83D\uDCF0 News"},{k:"standings",l:"Standings"},{k:"schedule",l:"Schedule"},
+    {k:"leaders",l:"Leaders"},{k:"players",l:"Players"},{k:"awards",l:"Awards"},
+    {k:"power",l:"Power"},{k:"trades",l:"Trades"},{k:"freeagency",l:"Free Agency"},
+    {k:"draft",l:"Draft"},{k:"retired",l:"Retired"},{k:"history",l:"History"}
+  ];
+
+  function content(){
+    if(sub){if(sub.t==="team")return vTeam(sub.d);if(sub.t==="box")return vBox(sub.d)}
+    var views={today:vToday,headlines:vHeadlines,standings:vStandings,schedule:vSchedule,leaders:vLeaders,players:vPlayers,awards:vAwards,power:vPower,trades:vTrades,freeagency:vFreeAgency,draft:vDraft,retired:vRetired,history:vHistory};
+    return(views[view]||vToday)();
+  }
+
+  var played=state.schedule.filter(function(g){return g.result}).length;
+
+  return h("div",{style:{maxWidth:960,margin:"0 auto",padding:"12px 16px"}},
+    renderModal(),
+    // HEADER
+    h("div",{style:{background:"linear-gradient(135deg,"+PRIMARY+",#8b1a2b)",color:"#fff",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,borderRadius:12,marginBottom:16,boxShadow:"0 4px 12px rgba(178,34,52,0.3)"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12}},
+        h("span",{style:{fontSize:28,fontWeight:800,letterSpacing:2}},"MDBA"),
+        h("div",{style:{fontSize:11,opacity:0.85,lineHeight:1.4}},
+          h("div",null,"Season "+(state.seasonNum||1)+" | "+state.phase.toUpperCase()+" | "+played+"/"+state.schedule.length),
+          h("div",{style:{display:"flex",alignItems:"center",gap:4,marginTop:2}},h("span",{style:{display:"inline-block",width:7,height:7,borderRadius:"50%",background:conn?"#4caf50":"#ff5252"}}),h("span",{style:{fontSize:10}},conn?"LIVE":"OFFLINE"))
+        )
+      ),
+      h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        state.phase==="season"&&!state.done?btn("\u25B6 Day",simDay):null,
+        state.phase==="season"&&!state.done?btn("\u25B6\u25B6 Week",simWeek):null,
+        state.phase==="season"&&!state.done?btn("\u23E9 All",simAll):null,
+        btn("\u2B07",download),btn("\u21BA",resetAll)
+      )
+    ),
+    // TABS
+    h("div",{style:{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap",overflowX:"auto"}},
+      tabs.map(function(t){return h("button",{key:t.k,className:"pill",style:{background:view===t.k&&!sub?PRIMARY:"#e8e8e8",color:view===t.k&&!sub?"#fff":"#444"},onClick:function(){setView(t.k);setSub(null)}},t.l)})
+    ),
+    content()
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
