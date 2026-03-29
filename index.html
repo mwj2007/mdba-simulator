@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDBA Season Simulator</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #222; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const EMBEDDED_ROSTERS = {"SEATTLE STINGRAYS":[{"name":"JALEN MILES","pos":"PG","age":27,"ovr":86,"info":"GREAT PASSER, GREAT W/ MOVING BALL, BEST HANDLES IN MDBA!"},{"name":"ISAIAH CARTER","pos":"SG","age":20,"ovr":90,"info":"GOOD SHOOTER AND IQ"},{"name":"BRYCE HARRIS","pos":"SF","age":25,"ovr":80,"info":"SPOT UP SHOOTER"},{"name":"MILES WILLIAMS","pos":"PF","age":20,"ovr":83,"info":"ATHLETIC, QUICK FIRST STEP"},{"name":"JULIAN WRIGHT","pos":"C","age":26,"ovr":80,"info":"GOOD POST MOVES"},{"name":"COLE RIVER","pos":"SF","age":30,"ovr":80,"info":"GOOD AT MIDDYS"}],"MILWAUKEE COMMANDERS":[{"name":"STEVE WRIGHT","pos":"PG","age":25,"ovr":81,"info":"CLEAN LAYUPS"},{"name":"LAMAR WALLACE","pos":"SG","age":25,"ovr":72,"info":"GOOD CORNER 3s"},{"name":"DESMOND KING","pos":"SF","age":21,"ovr":87,"info":"PLAYS LIKE LEBRON"},{"name":"TOBIAS SHAW","pos":"PF","age":30,"ovr":76,"info":"GOOD PASSING"},{"name":"JAXON GAZEL","pos":"C","age":19,"ovr":85,"info":"SLOW & CLEAN 3"},{"name":"DORIAN MCOY","pos":"SF","age":27,"ovr":79,"info":"BEST MIDDY IN LEAGUE"}],"MIAMI KNIGHTS":[{"name":"CAMERON BROOKS","pos":"PG","age":25,"ovr":91,"info":"SHIFTY SHOOTER,NICE PASSING & IQ"},{"name":"ELIJAH HAYES","pos":"SG","age":23,"ovr":78,"info":"CLEAN CORNER 3"},{"name":"DARIUS WASHINGTON","pos":"SF","age":28,"ovr":96,"info":"GREAT DUNKER,CLEAN MIDDY"},{"name":"NIKOLAS D'ANGELLO","pos":"PF","age":22,"ovr":76,"info":"GOOD IN THE POST"},{"name":"DEVIN KNOX","pos":"C","age":26,"ovr":84,"info":"GREAT REBOUNDER"},{"name":"CALEB JOHNSON","pos":"PG","age":19,"ovr":80,"info":"GOOD COURT VISTION AND SHOOTER"}],"BOSTON STARS":[{"name":"ANTHONY TOMAS","pos":"PG","age":23,"ovr":82,"info":"GOOD DUNKER & PASS"},{"name":"TOM STUNN","pos":"SG","age":28,"ovr":72,"info":"good at fades"},{"name":"EZEKIEL DOME","pos":"SF","age":24,"ovr":76,"info":"good at dunks"},{"name":"ROYCE TUCKER","pos":"PF","age":30,"ovr":93,"info":"GOOD POST FADE, INSANE 3-BALL"},{"name":"NICOH POKE","pos":"C","age":26,"ovr":77,"info":"good passing & post"},{"name":"KEVIN WALKER","pos":"PF","age":19,"ovr":79,"info":"GREAT MIDDY"}],"DETROIT ROCKETS":[{"name":"MASON BLUNT","pos":"PG","age":26,"ovr":83,"info":"BEST PASSER IN MDBA"},{"name":"ZION KING","pos":"SG","age":31,"ovr":75,"info":"GOOD PASSING"},{"name":"KELLEN MOORE","pos":"SF","age":29,"ovr":81,"info":"CLEAN 3s"},{"name":"NILES MCGEE","pos":"PF","age":20,"ovr":95,"info":"PLAYS LIKE KD"},{"name":"SAM CHARRIS","pos":"C","age":31,"ovr":82,"info":"NICE POSTING MOVES"},{"name":"TROY BENSON","pos":"C","age":21,"ovr":78,"info":"STRONG REBOUNDER"}],"LAS VEGAS ACES":[{"name":"CURTIS MALONE","pos":"PG","age":21,"ovr":80,"info":"good 3 ball"},{"name":"KADE ELLINGTON","pos":"SG","age":22,"ovr":84,"info":"ELITE SHOOTER"},{"name":"ANDREW PETROVIC","pos":"SF","age":23,"ovr":78,"info":"good middy"},{"name":"MALIK BELLINI","pos":"PF","age":22,"ovr":88,"info":"BEST DUNKER IN LEAGUE"},{"name":"IVAN FOX","pos":"C","age":26,"ovr":81,"info":"PLAYS LIKE JOKIC"},{"name":"METEO CRUZ","pos":"SG","age":23,"ovr":76,"info":"SHOOTS LIKE T-REX BUT STILL GOES IN"}],"KANSAS CITY MONARCHS":[{"name":"TYLER CORE","pos":"PG","age":22,"ovr":79,"info":"GOOD 3s"},{"name":"CALVIN CUNNINGHAM","pos":"SG","age":19,"ovr":90,"info":"GREAT DUNKER, AND FADED,MIDDY SPECIALEST"},{"name":"SAM DUFFE","pos":"SF","age":30,"ovr":71,"info":"CLEAN MIDDYS"},{"name":"JAXON PEIRCE","pos":"PF","age":19,"ovr":86,"info":"PLAYS LIKE WEMBY"},{"name":"DOMINIC WELLS","pos":"C","age":20,"ovr":86,"info":"IMITATES SHAQ"},{"name":"MAX WALKER","pos":"PF","age":19,"ovr":73,"info":"GOOD DUNKS"}],"NEW YORK LAZERS":[{"name":"MILES ROBINSON","pos":"PG","age":19,"ovr":85,"info":"SHOOTER"},{"name":"ANTHONY LEWIS","pos":"SG","age":19,"ovr":87,"info":"Slashing Scorer"},{"name":"LOGAN TUBBS","pos":"SF","age":21,"ovr":76,"info":"SHOOTER"},{"name":"ETHAN BROWN","pos":"PF","age":22,"ovr":77,"info":"GOOD D"},{"name":"XAVIER THOMPSON","pos":"C","age":19,"ovr":88,"info":"Elite Shot Blocker"}]};
+
+const TEAM_COLORS = [
+  '#006D75', '#2E4057', '#D4213D', '#1B4D3E',
+  '#C41E3A', '#C4975C', '#4169E1', '#FF6600'
+];
+const PRIMARY = '#B22234';
+
+// ─── Utility Functions ───
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randF(min, max) { return Math.random() * (max - min) + min; }
+function gaussRand(mean, std) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + std * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// ─── Initialize Teams ───
+function initTeams(rosterData) {
+  const teamNames = Object.keys(rosterData);
+  return teamNames.map((name, i) => {
+    const players = rosterData[name]
+      .map(p => ({
+        name: p.name,
+        pos: p.pos.trim(),
+        age: p.age,
+        ovr: p.ovr || Math.round(Math.max(55, Math.min(98, gaussRand(73, 10)))),
+        info: p.info,
+        stats: { gp:0, pts:0, reb:0, oreb:0, dreb:0, ast:0, stl:0, blk:0, to:0, pf:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, min:0 }
+      }))
+      .sort((a, b) => b.ovr - a.ovr);
+    return { name, color: TEAM_COLORS[i % TEAM_COLORS.length], players, wins: 0, losses: 0 };
+  });
+}
+
+// ─── Schedule Generator ───
+function generateSchedule(teams) {
+  const n = teams.length;
+  const gamesPerTeam = 82;
+  const gamePairs = [];
+  const gamesNeeded = (n * gamesPerTeam) / 2;
+  const gamesPerPair = Math.floor(gamesPerTeam / (n - 1));
+  const extra = gamesPerTeam - gamesPerPair * (n - 1);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      for (let k = 0; k < gamesPerPair; k++) {
+        const homeIdx = k % 2 === 0 ? i : j;
+        const awayIdx = k % 2 === 0 ? j : i;
+        gamePairs.push({ home: homeIdx, away: awayIdx });
+      }
+    }
+  }
+  // add extra games to reach 82
+  let teamGameCounts = new Array(n).fill(0);
+  gamePairs.forEach(g => { teamGameCounts[g.home]++; teamGameCounts[g.away]++; });
+
+  while (true) {
+    let allDone = true;
+    for (let i = 0; i < n; i++) {
+      if (teamGameCounts[i] < gamesPerTeam) { allDone = false; break; }
+    }
+    if (allDone) break;
+    const i = rand(0, n - 1);
+    const j = rand(0, n - 1);
+    if (i === j) continue;
+    if (teamGameCounts[i] >= gamesPerTeam || teamGameCounts[j] >= gamesPerTeam) continue;
+    gamePairs.push({ home: i, away: j });
+    teamGameCounts[i]++;
+    teamGameCounts[j]++;
+  }
+
+  // shuffle
+  for (let i = gamePairs.length - 1; i > 0; i--) {
+    const j = rand(0, i);
+    [gamePairs[i], gamePairs[j]] = [gamePairs[j], gamePairs[i]];
+  }
+
+  // greedy day assignment
+  const schedule = [];
+  const assigned = new Array(gamePairs.length).fill(false);
+  let day = 1;
+  let totalAssigned = 0;
+
+  while (totalAssigned < gamePairs.length) {
+    const busyTeams = new Set();
+    const dayGames = [];
+    for (let i = 0; i < gamePairs.length; i++) {
+      if (assigned[i]) continue;
+      const g = gamePairs[i];
+      if (busyTeams.has(g.home) || busyTeams.has(g.away)) continue;
+      busyTeams.add(g.home);
+      busyTeams.add(g.away);
+      dayGames.push({ ...g, day, result: null });
+      assigned[i] = true;
+      totalAssigned++;
+    }
+    schedule.push(...dayGames);
+    day++;
+  }
+
+  return schedule;
+}
+
+// ─── Simulation Engine ───
+const POS_BASELINES = {
+  PG: { reb: 3.5, ast: 6.5, blk: 0.2, stl: 1.3 },
+  SG: { reb: 3.8, ast: 3.5, blk: 0.3, stl: 1.1 },
+  SF: { reb: 5.5, ast: 3.0, blk: 0.5, stl: 1.0 },
+  PF: { reb: 7.5, ast: 2.5, blk: 0.8, stl: 0.7 },
+  C:  { reb: 9.5, ast: 2.0, blk: 1.5, stl: 0.6 }
+};
+
+function getMinutes(rosterIdx, numPlayers) {
+  if (rosterIdx < 5) return randF(30, 38);
+  if (rosterIdx < 8) return randF(16, 26);
+  if (rosterIdx < 11) return randF(6, 16);
+  return randF(0, 6);
+}
+
+function simGame(homeTeam, awayTeam) {
+  const homeAvg = homeTeam.players.reduce((s, p) => s + p.ovr, 0) / homeTeam.players.length;
+  const awayAvg = awayTeam.players.reduce((s, p) => s + p.ovr, 0) / awayTeam.players.length;
+  const diff = (homeAvg - awayAvg) * 0.4;
+  const pace = randF(105, 115);
+  const homeAdv = 2.5;
+  const homeTarget = Math.round(pace + diff + homeAdv + randF(-8, 8));
+  const awayTarget = Math.round(pace - diff - homeAdv + randF(-8, 8));
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const homeScore = clamp(homeTarget, 92, 135);
+  const awayScore = clamp(awayTarget, 92, 135);
+
+  function simTeamStats(team, targetScore) {
+    const playerStats = [];
+    let totalPts = 0;
+    const numP = team.players.length;
+
+    team.players.forEach((player, idx) => {
+      const base = POS_BASELINES[player.pos] || POS_BASELINES.SF;
+      const minutes = getMinutes(idx, numP);
+      const minScale = minutes / 36;
+      const ratingScale = player.ovr / 80;
+
+      // shooting
+      const usageRate = idx < 5 ? randF(0.12, 0.22) * ratingScale : randF(0.06, 0.14) * ratingScale;
+      const fga = Math.round(clamp(usageRate * 90 * minScale, 0, idx < 5 ? 25 : 15));
+      const fgPct = clamp(0.32 + (player.ovr - 60) * 0.0065 + randF(-0.05, 0.05), 0.32, 0.58);
+      const fgm = Math.round(fga * fgPct);
+
+      const tpa = Math.round(fga * randF(0.25, 0.45));
+      const tpPct = clamp(0.25 + (player.ovr - 60) * 0.005 + randF(-0.06, 0.06), 0.25, 0.45);
+      const tpm = Math.round(tpa * tpPct);
+
+      const fta = Math.round(clamp(fga * randF(0.15, 0.35), 0, 12));
+      const ftPct = clamp(0.55 + (player.ovr - 60) * 0.01 + randF(-0.08, 0.08), 0.55, 0.95);
+      const ftm = Math.round(fta * ftPct);
+
+      const pts = (fgm - tpm) * 2 + tpm * 3 + ftm;
+
+      const reb = Math.round(clamp(base.reb * minScale * randF(0.7, 1.3), 0, 20));
+      const oreb = Math.round(reb * randF(0.15, 0.35));
+      const dreb = reb - oreb;
+      const ast = Math.round(clamp(base.ast * minScale * ratingScale * randF(0.6, 1.4), 0, 18));
+      const stl = Math.round(clamp(base.stl * minScale * randF(0.5, 1.5), 0, 6));
+      const blk = Math.round(clamp(base.blk * minScale * randF(0.4, 1.6), 0, 7));
+      const to = Math.round(clamp(randF(0.5, 3) * minScale, 0, 8));
+      const pf = Math.round(clamp(randF(1, 4) * minScale, 0, 6));
+
+      totalPts += pts;
+      playerStats.push({ name: player.name, pos: player.pos, ovr: player.ovr, min: Math.round(minutes), pts, reb, oreb, dreb, ast, stl, blk, to, pf, fgm, fga, tpm, tpa, ftm, fta, rosterIdx: idx });
+    });
+
+    // normalize to target
+    if (totalPts > 0 && totalPts !== targetScore) {
+      const ratio = targetScore / totalPts;
+      let newTotal = 0;
+      playerStats.forEach(ps => {
+        ps.pts = Math.round(ps.pts * ratio);
+        newTotal += ps.pts;
+      });
+      const diff = targetScore - newTotal;
+      if (diff !== 0) {
+        const topScorer = playerStats.reduce((best, p) => p.pts > best.pts ? p : best, playerStats[0]);
+        topScorer.pts += diff;
+      }
+    }
+
+    return playerStats;
+  }
+
+  let hStats = simTeamStats(homeTeam, homeScore);
+  let aStats = simTeamStats(awayTeam, awayScore);
+  let hTotal = hStats.reduce((s, p) => s + p.pts, 0);
+  let aTotal = aStats.reduce((s, p) => s + p.pts, 0);
+
+  // break ties
+  if (hTotal === aTotal) {
+    const lucky = hStats[rand(0, Math.min(4, hStats.length - 1))];
+    lucky.pts += 2;
+    hTotal += 2;
+  }
+
+  return {
+    homeScore: hTotal,
+    awayScore: aTotal,
+    homeStats: hStats,
+    awayStats: aStats
+  };
+}
+
+// ─── Accumulate player stats ───
+function accumulateStats(team, gameStats) {
+  gameStats.forEach(gs => {
+    const player = team.players.find(p => p.name === gs.name);
+    if (!player) return;
+    const s = player.stats;
+    s.gp++;
+    s.pts += gs.pts; s.reb += gs.reb; s.oreb += gs.oreb; s.dreb += gs.dreb;
+    s.ast += gs.ast; s.stl += gs.stl; s.blk += gs.blk; s.to += gs.to; s.pf += gs.pf;
+    s.fgm += gs.fgm; s.fga += gs.fga; s.tpm += gs.tpm; s.tpa += gs.tpa;
+    s.ftm += gs.ftm; s.fta += gs.fta; s.min += gs.min;
+  });
+}
+
+function avg(val, gp) { return gp > 0 ? (val / gp).toFixed(1) : '0.0'; }
+function pct(made, att) { return att > 0 ? (made / att * 100).toFixed(1) : '0.0'; }
+
+// ─── Styles ───
+const styles = {
+  container: { maxWidth: 920, margin: '0 auto', padding: '10px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' },
+  header: { background: PRIMARY, color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, borderRadius: 8, marginBottom: 16 },
+  headerTitle: { fontSize: 22, fontWeight: 700, letterSpacing: 1 },
+  btn: { background: '#fff', color: PRIMARY, border: 'none', borderRadius: 6, padding: '6px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 14 },
+  btnSm: { background: PRIMARY, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontSize: 12 },
+  tabs: { display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' },
+  tab: (active) => ({ padding: '8px 16px', borderRadius: 6, border: 'none', background: active ? PRIMARY : '#e0e0e0', color: active ? '#fff' : '#333', fontWeight: 600, cursor: 'pointer', fontSize: 13 }),
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+  th: { background: '#333', color: '#fff', padding: '8px 6px', textAlign: 'left', position: 'sticky', top: 0, fontSize: 12, fontWeight: 600 },
+  td: { padding: '6px', borderBottom: '1px solid #e0e0e0' },
+  teamDot: (color) => ({ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: color, marginRight: 6 }),
+  ovrBadge: (ovr) => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#fff', background: ovr >= 85 ? PRIMARY : ovr >= 75 ? '#e88' : '#ccc' }),
+  card: { background: '#fff', borderRadius: 8, padding: 16, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  clickRow: { cursor: 'pointer' },
+  goldCard: { background: 'linear-gradient(135deg, #fff8e1, #ffe082)', border: `2px solid ${PRIMARY}`, borderRadius: 8, padding: 12, marginBottom: 12 },
+  medalEmoji: (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉',
+};
+
+// ─── Main App ───
+function App() {
+  const [state, setState] = React.useState(null);
+  const [view, setView] = React.useState('today');
+  const [subView, setSubView] = React.useState(null); // {type, data}
+  const [schedulePage, setSchedulePage] = React.useState(0);
+  const [leaderCat, setLeaderCat] = React.useState('pts');
+  const [expanded, setExpanded] = React.useState(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = React.useState(false);
+  const fileRef = React.useRef(null);
+
+  // Load on mount
+  React.useEffect(() => {
+    const saved = localStorage.getItem('mdba-save');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setState(parsed);
+        return;
+      } catch(e) {}
+    }
+    // init from embedded
+    startNewSeason(EMBEDDED_ROSTERS);
+  }, []);
+
+  function startNewSeason(rosterData) {
+    const teams = initTeams(rosterData || EMBEDDED_ROSTERS);
+    const schedule = generateSchedule(teams);
+    const history = state ? (state.history || []) : [];
+    const newState = { teams, schedule, currentDay: 1, done: false, history, rosterData: rosterData || EMBEDDED_ROSTERS };
+    setState(newState);
+    save(newState);
+    setView('today');
+    setSubView(null);
+  }
+
+  function save(s) {
+    try { localStorage.setItem('mdba-save', JSON.stringify(s)); } catch(e) {}
+  }
+
+  function simGameAtIndex(gameIdx) {
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const game = next.schedule[gameIdx];
+      if (game.result) return prev;
+      const homeTeam = next.teams[game.home];
+      const awayTeam = next.teams[game.away];
+      const result = simGame(homeTeam, awayTeam);
+      game.result = result;
+      if (result.homeScore > result.awayScore) { homeTeam.wins++; awayTeam.losses++; }
+      else { awayTeam.wins++; homeTeam.losses++; }
+      accumulateStats(homeTeam, result.homeStats);
+      accumulateStats(awayTeam, result.awayStats);
+
+      // check if season done
+      const allPlayed = next.schedule.every(g => g.result);
+      if (allPlayed) {
+        next.done = true;
+        archiveSeason(next);
+      }
+      save(next);
+      return next;
+    });
+  }
+
+  function simDay() {
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const dayGames = next.schedule.filter(g => g.day === next.currentDay && !g.result);
+      dayGames.forEach(game => {
+        const homeTeam = next.teams[game.home];
+        const awayTeam = next.teams[game.away];
+        const result = simGame(homeTeam, awayTeam);
+        const actualGame = next.schedule.find(g => g.day === game.day && g.home === game.home && g.away === game.away && !g.result);
+        if (actualGame) {
+          actualGame.result = result;
+          if (result.homeScore > result.awayScore) { homeTeam.wins++; awayTeam.losses++; }
+          else { awayTeam.wins++; homeTeam.losses++; }
+          accumulateStats(homeTeam, result.homeStats);
+          accumulateStats(awayTeam, result.awayStats);
+        }
+      });
+      const remainToday = next.schedule.filter(g => g.day === next.currentDay && !g.result);
+      if (remainToday.length === 0) {
+        const maxDay = Math.max(...next.schedule.map(g => g.day));
+        if (next.currentDay < maxDay) next.currentDay++;
+      }
+      const allPlayed = next.schedule.every(g => g.result);
+      if (allPlayed) { next.done = true; archiveSeason(next); }
+      save(next);
+      return next;
+    });
+  }
+
+  function advanceDay() {
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const maxDay = Math.max(...next.schedule.map(g => g.day));
+      if (next.currentDay < maxDay) next.currentDay++;
+      save(next);
+      return next;
+    });
+  }
+
+  function simWeek() {
+    for (let i = 0; i < 7; i++) simDay();
+  }
+
+  function simAll() {
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.schedule.forEach(game => {
+        if (game.result) return;
+        const homeTeam = next.teams[game.home];
+        const awayTeam = next.teams[game.away];
+        const result = simGame(homeTeam, awayTeam);
+        game.result = result;
+        if (result.homeScore > result.awayScore) { homeTeam.wins++; awayTeam.losses++; }
+        else { awayTeam.wins++; homeTeam.losses++; }
+        accumulateStats(homeTeam, result.homeStats);
+        accumulateStats(awayTeam, result.awayStats);
+      });
+      next.done = true;
+      next.currentDay = Math.max(...next.schedule.map(g => g.day));
+      archiveSeason(next);
+      save(next);
+      return next;
+    });
+  }
+
+  function archiveSeason(st) {
+    const standings = [...st.teams].sort((a, b) => {
+      const pctA = a.wins / (a.wins + a.losses || 1);
+      const pctB = b.wins / (b.wins + b.losses || 1);
+      return pctB - pctA || b.wins - a.wins;
+    });
+    const champion = standings[0];
+    const mvp = computeMVP(st);
+    const awards = computeAllAwards(st);
+    const leaders = computeLeaders(st);
+    const season = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString(),
+      champion: champion.name,
+      championColor: champion.color,
+      championRecord: `${champion.wins}-${champion.losses}`,
+      mvp: mvp ? mvp.name : 'N/A',
+      mvpTeam: mvp ? mvp.teamName : '',
+      awards,
+      leaders,
+      standings: standings.map(t => ({ name: t.name, color: t.color, wins: t.wins, losses: t.losses }))
+    };
+    if (!st.history) st.history = [];
+    st.history.push(season);
+  }
+
+  function computeMVP(st) {
+    let best = null, bestScore = -1;
+    st.teams.forEach(team => {
+      const wpct = team.wins / (team.wins + team.losses || 1);
+      team.players.forEach(p => {
+        if (p.stats.gp < 5) return;
+        const gp = p.stats.gp;
+        const score = p.stats.pts/gp + (p.stats.reb/gp)*0.7 + (p.stats.ast/gp)*0.85 + (p.stats.stl/gp)*1.2 + p.stats.blk/gp + wpct*18;
+        if (score > bestScore) { bestScore = score; best = { ...p, teamName: team.name, teamColor: team.color }; }
+      });
+    });
+    return best;
+  }
+
+  function computeAllAwards(st) {
+    const allPlayers = [];
+    st.teams.forEach(team => {
+      const wpct = team.wins / (team.wins + team.losses || 1);
+      team.players.forEach((p, idx) => {
+        if (p.stats.gp < 1) return;
+        allPlayers.push({ ...p, teamName: team.name, teamColor: team.color, rosterIdx: idx, wpct });
+      });
+    });
+
+    const mvpCandidates = allPlayers.filter(p => p.stats.gp >= 5).map(p => {
+      const gp = p.stats.gp;
+      const score = p.stats.pts/gp + (p.stats.reb/gp)*0.7 + (p.stats.ast/gp)*0.85 + (p.stats.stl/gp)*1.2 + p.stats.blk/gp + p.wpct*18;
+      return { ...p, awardScore: score };
+    }).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+
+    const dpoyCandidates = allPlayers.filter(p => p.stats.gp >= 5).map(p => {
+      const gp = p.stats.gp;
+      const score = (p.stats.stl/gp)*2 + (p.stats.blk/gp)*2.5 + (p.stats.reb/gp)*0.4;
+      return { ...p, awardScore: score };
+    }).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+
+    const smoy = allPlayers.filter(p => p.rosterIdx >= 5 && p.stats.gp >= 5).map(p => {
+      const gp = p.stats.gp;
+      const score = p.stats.pts/gp + (p.stats.reb/gp)*0.5 + (p.stats.ast/gp)*0.7;
+      return { ...p, awardScore: score };
+    }).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+
+    const mip = allPlayers.filter(p => p.ovr <= 80 && p.stats.gp >= 5).map(p => {
+      const gp = p.stats.gp;
+      const expected = p.ovr * 0.2;
+      const actual = p.stats.pts/gp;
+      const score = actual - expected + (p.stats.reb/gp)*0.3 + (p.stats.ast/gp)*0.3;
+      return { ...p, awardScore: score };
+    }).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+
+    const roy = allPlayers.filter(p => p.ovr <= 75 && p.stats.gp >= 5).map(p => {
+      const gp = p.stats.gp;
+      const score = p.stats.pts/gp + (p.stats.reb/gp)*0.5 + (p.stats.ast/gp)*0.5;
+      return { ...p, awardScore: score };
+    }).sort((a, b) => b.awardScore - a.awardScore).slice(0, 5);
+
+    return { mvp: mvpCandidates, dpoy: dpoyCandidates, smoy, mip, roy };
+  }
+
+  function computeLeaders(st) {
+    const all = [];
+    st.teams.forEach(team => {
+      team.players.forEach(p => {
+        if (p.stats.gp < 1) return;
+        all.push({ name: p.name, pos: p.pos, teamName: team.name, teamColor: team.color, stats: p.stats });
+      });
+    });
+    const topN = (key, n = 20) => [...all].sort((a, b) => (b.stats[key]/b.stats.gp) - (a.stats[key]/a.stats.gp)).slice(0, n);
+    return { pts: topN('pts'), reb: topN('reb'), ast: topN('ast'), stl: topN('stl'), blk: topN('blk') };
+  }
+
+  function downloadSave() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mdba-save.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+      const rosterData = {};
+      wb.SheetNames.forEach(name => {
+        if (name.toLowerCase().includes('sheet') && !name.match(/[A-Z]/)) return;
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
+        if (!data.length) return;
+        const keys = Object.keys(data[0]);
+        const players = data.map(row => ({
+          name: (row[keys[0]] || '').toString().trim(),
+          pos: (row[keys[1]] || '').toString().trim(),
+          age: parseInt(row[keys[2]]) || 0,
+          ovr: parseInt(row[keys[5]]) || 0,
+          info: (row[keys[6]] || '').toString().trim()
+        })).filter(p => p.name);
+        if (players.length > 0) rosterData[name] = players;
+      });
+      if (Object.keys(rosterData).length > 0) startNewSeason(rosterData);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  if (!state) {
+    return React.createElement('div', { style: { ...styles.container, textAlign: 'center', paddingTop: 60 } },
+      React.createElement('h1', { style: { color: PRIMARY, marginBottom: 20 } }, 'MDBA Season Simulator'),
+      React.createElement('p', { style: { marginBottom: 20 } }, 'Loading...'),
+    );
+  }
+
+  const maxDay = state.schedule.length > 0 ? Math.max(...state.schedule.map(g => g.day)) : 1;
+  const todayGames = state.schedule.filter(g => g.day === state.currentDay);
+  const allTodayDone = todayGames.every(g => g.result);
+
+  // ─── Render Helpers ───
+  function renderStandings() {
+    const sorted = [...state.teams].sort((a, b) => {
+      const pctA = a.wins / Math.max(a.wins + a.losses, 1);
+      const pctB = b.wins / Math.max(b.wins + b.losses, 1);
+      return pctB - pctA || b.wins - a.wins;
+    });
+    const topWins = sorted[0] ? sorted[0].wins : 0;
+    const topLosses = sorted[0] ? sorted[0].losses : 0;
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'Standings'),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: styles.table },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['#', 'Team', 'W', 'L', 'PCT', 'GB'].map(h =>
+                React.createElement('th', { key: h, style: styles.th }, h)
+              )
+            )
+          ),
+          React.createElement('tbody', null,
+            sorted.map((team, i) => {
+              const gp = team.wins + team.losses;
+              const wpct = gp > 0 ? (team.wins / gp).toFixed(3) : '.000';
+              const gb = gp > 0 ? (((topWins - topLosses) - (team.wins - team.losses)) / 2) : 0;
+              return React.createElement('tr', {
+                key: team.name,
+                style: { ...styles.clickRow, background: i % 2 === 0 ? '#fff' : '#f9f9f9' },
+                onClick: () => setSubView({ type: 'team', data: team.name })
+              },
+                React.createElement('td', { style: styles.td }, i + 1),
+                React.createElement('td', { style: styles.td },
+                  React.createElement('span', { style: styles.teamDot(team.color) }),
+                  team.name
+                ),
+                React.createElement('td', { style: { ...styles.td, fontWeight: 700 } }, team.wins),
+                React.createElement('td', { style: styles.td }, team.losses),
+                React.createElement('td', { style: styles.td }, wpct),
+                React.createElement('td', { style: styles.td }, gb === 0 ? '-' : gb.toFixed(1))
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
+  function renderTeamDetail(teamName) {
+    const team = state.teams.find(t => t.name === teamName);
+    if (!team) return React.createElement('div', null, 'Team not found');
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 } },
+        React.createElement('button', { style: styles.btnSm, onClick: () => setSubView(null) }, '< Back'),
+        React.createElement('span', { style: { ...styles.teamDot(team.color), width: 16, height: 16 } }),
+        React.createElement('h2', { style: { color: PRIMARY } }, team.name),
+        React.createElement('span', { style: { fontSize: 16, fontWeight: 600 } }, `${team.wins}-${team.losses}`)
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: styles.table },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['Player', 'POS', 'OVR', 'GP', 'PPG', 'RPG', 'APG', 'SPG', 'BPG', 'FG%', '3P%', 'FT%', 'MPG'].map(h =>
+                React.createElement('th', { key: h, style: styles.th }, h)
+              )
+            )
+          ),
+          React.createElement('tbody', null,
+            team.players.map((p, i) => {
+              const gp = p.stats.gp;
+              const borderStyle = i === 5 ? { borderTop: `3px solid ${PRIMARY}` } : {};
+              return React.createElement('tr', { key: p.name, style: { ...borderStyle, background: i % 2 === 0 ? '#fff' : '#f9f9f9' } },
+                React.createElement('td', { style: { ...styles.td, fontWeight: 600 } }, p.name),
+                React.createElement('td', { style: styles.td }, p.pos),
+                React.createElement('td', { style: styles.td }, React.createElement('span', { style: styles.ovrBadge(p.ovr) }, p.ovr)),
+                React.createElement('td', { style: styles.td }, gp),
+                React.createElement('td', { style: styles.td }, avg(p.stats.pts, gp)),
+                React.createElement('td', { style: styles.td }, avg(p.stats.reb, gp)),
+                React.createElement('td', { style: styles.td }, avg(p.stats.ast, gp)),
+                React.createElement('td', { style: styles.td }, avg(p.stats.stl, gp)),
+                React.createElement('td', { style: styles.td }, avg(p.stats.blk, gp)),
+                React.createElement('td', { style: styles.td }, pct(p.stats.fgm, p.stats.fga) + '%'),
+                React.createElement('td', { style: styles.td }, pct(p.stats.tpm, p.stats.tpa) + '%'),
+                React.createElement('td', { style: styles.td }, pct(p.stats.ftm, p.stats.fta) + '%'),
+                React.createElement('td', { style: styles.td }, avg(p.stats.min, gp))
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
+  function renderBoxScore(gameIdx) {
+    const game = state.schedule[gameIdx];
+    if (!game || !game.result) return React.createElement('div', null, 'No box score');
+    const homeTeam = state.teams[game.home];
+    const awayTeam = state.teams[game.away];
+    const r = game.result;
+
+    function renderTeamBox(teamName, color, stats, isWinner) {
+      const sorted = [...stats].sort((a, b) => a.rosterIdx - b.rosterIdx);
+      const totals = { min:0, pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 };
+      sorted.forEach(p => { Object.keys(totals).forEach(k => { totals[k] += p[k]; }); });
+
+      return React.createElement('div', { style: { marginBottom: 16 } },
+        React.createElement('h3', { style: { marginBottom: 8 } },
+          React.createElement('span', { style: styles.teamDot(color) }),
+          teamName, isWinner ? ' (W)' : ' (L)'
+        ),
+        React.createElement('div', { style: { overflowX: 'auto' } },
+          React.createElement('table', { style: styles.table },
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ['Player', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FG', '3PT', 'FT'].map(h =>
+                  React.createElement('th', { key: h, style: styles.th }, h)
+                )
+              )
+            ),
+            React.createElement('tbody', null,
+              sorted.map((p, i) => {
+                const highlight = p.pts >= 20 ? { color: PRIMARY, fontWeight: 700 } : {};
+                const borderStyle = i === 5 ? { borderTop: `3px solid ${PRIMARY}` } : {};
+                return React.createElement('tr', { key: p.name, style: { ...borderStyle, background: i % 2 === 0 ? '#fff' : '#f9f9f9' } },
+                  React.createElement('td', { style: { ...styles.td, fontWeight: 600, ...highlight } }, p.name),
+                  React.createElement('td', { style: styles.td }, p.min),
+                  React.createElement('td', { style: { ...styles.td, fontWeight: 700, ...highlight } }, p.pts),
+                  React.createElement('td', { style: styles.td }, p.reb),
+                  React.createElement('td', { style: styles.td }, p.ast),
+                  React.createElement('td', { style: styles.td }, p.stl),
+                  React.createElement('td', { style: styles.td }, p.blk),
+                  React.createElement('td', { style: styles.td }, p.to),
+                  React.createElement('td', { style: styles.td }, p.pf),
+                  React.createElement('td', { style: styles.td }, `${p.fgm}/${p.fga}`),
+                  React.createElement('td', { style: styles.td }, `${p.tpm}/${p.tpa}`),
+                  React.createElement('td', { style: styles.td }, `${p.ftm}/${p.fta}`)
+                );
+              }),
+              React.createElement('tr', { key: 'totals', style: { background: '#eee', fontWeight: 700 } },
+                React.createElement('td', { style: styles.td }, 'TOTALS'),
+                React.createElement('td', { style: styles.td }, ''),
+                React.createElement('td', { style: styles.td }, totals.pts),
+                React.createElement('td', { style: styles.td }, totals.reb),
+                React.createElement('td', { style: styles.td }, totals.ast),
+                React.createElement('td', { style: styles.td }, totals.stl),
+                React.createElement('td', { style: styles.td }, totals.blk),
+                React.createElement('td', { style: styles.td }, totals.to),
+                React.createElement('td', { style: styles.td }, totals.pf),
+                React.createElement('td', { style: styles.td }, `${totals.fgm}/${totals.fga}`),
+                React.createElement('td', { style: styles.td }, `${totals.tpm}/${totals.tpa}`),
+                React.createElement('td', { style: styles.td }, `${totals.ftm}/${totals.fta}`)
+              )
+            )
+          )
+        )
+      );
+    }
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('button', { style: { ...styles.btnSm, marginBottom: 12 }, onClick: () => setSubView(null) }, '< Back'),
+      React.createElement('div', { style: { textAlign: 'center', marginBottom: 20, padding: 16, background: '#f5f5f5', borderRadius: 8 } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 30 } },
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, awayTeam.name),
+            React.createElement('div', { style: { fontSize: 36, fontWeight: 700, color: r.awayScore > r.homeScore ? PRIMARY : '#666' } }, r.awayScore)
+          ),
+          React.createElement('div', { style: { fontSize: 18, color: '#999' } }, '@'),
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 14, fontWeight: 600 } }, homeTeam.name),
+            React.createElement('div', { style: { fontSize: 36, fontWeight: 700, color: r.homeScore > r.awayScore ? PRIMARY : '#666' } }, r.homeScore)
+          )
+        )
+      ),
+      renderTeamBox(awayTeam.name, awayTeam.color, r.awayStats, r.awayScore > r.homeScore),
+      renderTeamBox(homeTeam.name, homeTeam.color, r.homeStats, r.homeScore > r.awayScore)
+    );
+  }
+
+  function renderSchedule() {
+    const days = [...new Set(state.schedule.map(g => g.day))].sort((a, b) => a - b);
+    const daysPerPage = 10;
+    const totalPages = Math.ceil(days.length / daysPerPage);
+    const pageDays = days.slice(schedulePage * daysPerPage, (schedulePage + 1) * daysPerPage);
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'Schedule'),
+      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+        React.createElement('button', { style: styles.btnSm, onClick: () => setSchedulePage(Math.max(0, schedulePage - 1)), disabled: schedulePage === 0 }, '< Prev'),
+        React.createElement('span', { style: { fontSize: 13, lineHeight: '28px' } }, `Page ${schedulePage + 1} of ${totalPages}`),
+        React.createElement('button', { style: styles.btnSm, onClick: () => setSchedulePage(Math.min(totalPages - 1, schedulePage + 1)), disabled: schedulePage >= totalPages - 1 }, 'Next >')
+      ),
+      pageDays.map(day => {
+        const dayGames = state.schedule.filter(g => g.day === day);
+        return React.createElement('div', { key: day, style: { marginBottom: 12 } },
+          React.createElement('h4', { style: { fontSize: 13, color: '#666', marginBottom: 4 } }, `Day ${day}`),
+          dayGames.map((game, gi) => {
+            const away = state.teams[game.away];
+            const home = state.teams[game.home];
+            const gameIdx = state.schedule.indexOf(game);
+            const played = !!game.result;
+            return React.createElement('div', {
+              key: gi,
+              style: { padding: '6px 10px', background: played ? '#f9f9f9' : '#fff', borderRadius: 4, marginBottom: 2, fontSize: 13, cursor: played ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+              onClick: played ? () => setSubView({ type: 'boxscore', data: gameIdx }) : undefined
+            },
+              React.createElement('span', null,
+                React.createElement('span', { style: styles.teamDot(away.color) }),
+                React.createElement('span', { style: played && game.result.awayScore > game.result.homeScore ? { fontWeight: 700, color: PRIMARY } : {} }, away.name),
+                ' @ ',
+                React.createElement('span', { style: styles.teamDot(home.color) }),
+                React.createElement('span', { style: played && game.result.homeScore > game.result.awayScore ? { fontWeight: 700, color: PRIMARY } : {} }, home.name)
+              ),
+              played ? React.createElement('span', { style: { fontWeight: 600 } }, `${game.result.awayScore} - ${game.result.homeScore}`) : React.createElement('span', { style: { color: '#aaa' } }, 'TBD')
+            );
+          })
+        );
+      })
+    );
+  }
+
+  function renderToday() {
+    return React.createElement('div', { style: styles.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, `Day ${state.currentDay}`),
+      state.done ?
+        React.createElement('div', { style: { textAlign: 'center', padding: 30, fontSize: 20, fontWeight: 700, color: PRIMARY } }, 'Season Complete!') :
+        React.createElement('div', null,
+          todayGames.map((game, i) => {
+            const away = state.teams[game.away];
+            const home = state.teams[game.home];
+            const gameIdx = state.schedule.indexOf(game);
+            const played = !!game.result;
+            return React.createElement('div', { key: i, style: { padding: '10px 12px', background: i % 2 === 0 ? '#fff' : '#f9f9f9', borderRadius: 6, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+              React.createElement('span', { style: { fontSize: 14 } },
+                React.createElement('span', { style: styles.teamDot(away.color) }),
+                away.name,
+                ' @ ',
+                React.createElement('span', { style: styles.teamDot(home.color) }),
+                home.name
+              ),
+              played ?
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                  React.createElement('span', { style: { fontWeight: 700 } }, `${game.result.awayScore} - ${game.result.homeScore}`),
+                  React.createElement('button', { style: styles.btnSm, onClick: () => setSubView({ type: 'boxscore', data: gameIdx }) }, 'Box Score \u2192')
+                ) :
+                React.createElement('button', { style: { ...styles.btnSm, background: '#28a745' } }, React.createElement('span', { onClick: () => simGameAtIndex(gameIdx) }, '\u25B6 Sim'))
+            );
+          }),
+          allTodayDone && !state.done ? React.createElement('div', { style: { textAlign: 'center', marginTop: 16 } },
+            React.createElement('button', { style: { ...styles.btn, background: PRIMARY, color: '#fff', fontSize: 16, padding: '10px 24px' }, onClick: advanceDay }, `Advance to Day ${state.currentDay + 1} \u2192`)
+          ) : null
+        )
+    );
+  }
+
+  function renderLeaders() {
+    const cats = [
+      { key: 'pts', label: 'Scoring' },
+      { key: 'reb', label: 'Rebounds' },
+      { key: 'ast', label: 'Assists' },
+      { key: 'stl', label: 'Steals' },
+      { key: 'blk', label: 'Blocks' }
+    ];
+
+    const allPlayers = [];
+    state.teams.forEach(team => {
+      team.players.forEach(p => {
+        if (p.stats.gp < 1) return;
+        allPlayers.push({ ...p, teamName: team.name, teamColor: team.color });
+      });
+    });
+
+    const sorted = [...allPlayers].sort((a, b) => {
+      return (b.stats[leaderCat] / b.stats.gp) - (a.stats[leaderCat] / a.stats.gp);
+    }).slice(0, 20);
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('h2', { style: { marginBottom: 12, color: PRIMARY } }, 'League Leaders'),
+      React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' } },
+        cats.map(c =>
+          React.createElement('button', { key: c.key, style: styles.tab(leaderCat === c.key), onClick: () => setLeaderCat(c.key) }, c.label)
+        )
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: styles.table },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['#', 'Player', 'Team', 'GP', 'POS', 'Per Game'].map(h =>
+                React.createElement('th', { key: h, style: styles.th }, h)
+              )
+            )
+          ),
+          React.createElement('tbody', null,
+            sorted.map((p, i) => React.createElement('tr', {
+              key: p.name + p.teamName,
+              style: { background: i < 3 ? '#fff0f0' : i % 2 === 0 ? '#fff' : '#f9f9f9' }
+            },
+              React.createElement('td', { style: { ...styles.td, fontWeight: i < 3 ? 700 : 400, color: i < 3 ? PRIMARY : '#333' } }, i + 1),
+              React.createElement('td', { style: { ...styles.td, fontWeight: 600 } }, p.name),
+              React.createElement('td', { style: styles.td },
+                React.createElement('span', { style: styles.teamDot(p.teamColor) }), p.teamName
+              ),
+              React.createElement('td', { style: styles.td }, p.stats.gp),
+              React.createElement('td', { style: styles.td }, p.pos),
+              React.createElement('td', { style: { ...styles.td, fontWeight: 700 } }, avg(p.stats[leaderCat], p.stats.gp))
+            ))
+          )
+        )
+      )
+    );
+  }
+
+  function renderAwards() {
+    const awards = computeAllAwards(state);
+    const cats = [
+      { key: 'mvp', label: 'MVP' },
+      { key: 'dpoy', label: 'Defensive Player of the Year' },
+      { key: 'smoy', label: 'Sixth Man of the Year' },
+      { key: 'mip', label: 'Most Improved Player' },
+      { key: 'roy', label: 'Rookie of the Year' }
+    ];
+
+    const leaders = computeLeaders(state);
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('h2', { style: { marginBottom: 16, color: PRIMARY } }, 'Season Awards'),
+      cats.map(cat => {
+        const candidates = awards[cat.key];
+        if (!candidates || candidates.length === 0) return React.createElement('div', { key: cat.key, style: { marginBottom: 16 } },
+          React.createElement('h3', { style: { marginBottom: 8 } }, cat.label),
+          React.createElement('p', { style: { color: '#999' } }, 'No eligible candidates')
+        );
+        return React.createElement('div', { key: cat.key, style: { marginBottom: 20 } },
+          React.createElement('h3', { style: { marginBottom: 8 } }, cat.label),
+          candidates.map((p, i) => {
+            const gp = p.stats.gp;
+            const containerStyle = i === 0 ? styles.goldCard : { padding: '8px 12px', background: '#f9f9f9', borderRadius: 6, marginBottom: 4 };
+            return React.createElement('div', { key: p.name, style: containerStyle },
+              React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                React.createElement('div', null,
+                  React.createElement('span', { style: { fontWeight: 700, fontSize: i === 0 ? 16 : 14 } }, `${i + 1}. ${p.name}`),
+                  React.createElement('span', { style: { color: '#666', marginLeft: 8, fontSize: 12 } },
+                    React.createElement('span', { style: styles.teamDot(p.teamColor) }), p.teamName
+                  )
+                ),
+                React.createElement('span', { style: { fontSize: 12, color: '#666' } },
+                  `${avg(p.stats.pts, gp)} PPG | ${avg(p.stats.reb, gp)} RPG | ${avg(p.stats.ast, gp)} APG | ${avg(p.stats.stl, gp)} SPG | ${avg(p.stats.blk, gp)} BPG`
+                )
+              )
+            );
+          })
+        );
+      }),
+      React.createElement('h2', { style: { marginBottom: 16, marginTop: 24, color: PRIMARY } }, 'Statistical Champions'),
+      ['pts', 'reb', 'ast', 'stl', 'blk'].map(cat => {
+        const top3 = (leaders[cat] || []).slice(0, 3);
+        const label = { pts: 'Scoring', reb: 'Rebounds', ast: 'Assists', stl: 'Steals', blk: 'Blocks' }[cat];
+        return React.createElement('div', { key: cat, style: { marginBottom: 12 } },
+          React.createElement('h4', { style: { fontSize: 14, marginBottom: 4 } }, label),
+          top3.map((p, i) => React.createElement('div', { key: p.name, style: { fontSize: 13, padding: '2px 0' } },
+            styles.medalEmoji(i), ' ', p.name, ' (', p.teamName, ') — ', avg(p.stats[cat], p.stats.gp), '/g'
+          ))
+        );
+      })
+    );
+  }
+
+  function renderHistory() {
+    const history = state.history || [];
+
+    function deleteSeason(id) {
+      setState(prev => {
+        const next = { ...prev, history: prev.history.filter(s => s.id !== id) };
+        save(next);
+        return next;
+      });
+      setConfirmDelete(null);
+    }
+
+    function deleteAll() {
+      setState(prev => {
+        const next = { ...prev, history: [] };
+        save(next);
+        return next;
+      });
+      setConfirmDeleteAll(false);
+    }
+
+    return React.createElement('div', { style: styles.card },
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 } },
+        React.createElement('h2', { style: { color: PRIMARY } }, 'Season History'),
+        history.length > 0 ? (
+          confirmDeleteAll ?
+            React.createElement('div', { style: { display: 'flex', gap: 4 } },
+              React.createElement('button', { style: { ...styles.btnSm, background: '#dc3545' }, onClick: deleteAll }, 'Confirm Delete All'),
+              React.createElement('button', { style: styles.btnSm, onClick: () => setConfirmDeleteAll(false) }, 'Cancel')
+            ) :
+            React.createElement('button', { style: { ...styles.btnSm, background: '#dc3545' }, onClick: () => setConfirmDeleteAll(true) }, 'Delete All')
+        ) : null
+      ),
+      history.length === 0 ?
+        React.createElement('p', { style: { color: '#999' } }, 'No completed seasons yet.') :
+        history.map((season, si) => React.createElement('div', { key: season.id, style: { marginBottom: 12, background: '#f9f9f9', borderRadius: 8, padding: 12 } },
+          React.createElement('div', {
+            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
+            onClick: () => setExpanded(expanded === si ? null : si)
+          },
+            React.createElement('div', null,
+              React.createElement('span', { style: { fontWeight: 700, fontSize: 15 } }, `Season ${si + 1}`),
+              React.createElement('span', { style: { marginLeft: 12, fontSize: 13 } },
+                React.createElement('span', { style: styles.teamDot(season.championColor) }),
+                season.champion, ' | MVP: ', season.mvp
+              ),
+              React.createElement('span', { style: { marginLeft: 12, fontSize: 12, color: '#999' } }, season.date)
+            ),
+            React.createElement('div', { style: { display: 'flex', gap: 4 } },
+              confirmDelete === season.id ?
+                React.createElement('div', { style: { display: 'flex', gap: 4 } },
+                  React.createElement('button', { style: { ...styles.btnSm, background: '#dc3545' }, onClick: (e) => { e.stopPropagation(); deleteSeason(season.id); } }, 'Confirm'),
+                  React.createElement('button', { style: styles.btnSm, onClick: (e) => { e.stopPropagation(); setConfirmDelete(null); } }, 'Cancel')
+                ) :
+                React.createElement('button', { style: { ...styles.btnSm, background: '#dc3545' }, onClick: (e) => { e.stopPropagation(); setConfirmDelete(season.id); } }, 'Delete')
+            )
+          ),
+          expanded === si ? React.createElement('div', { style: { marginTop: 12 } },
+            React.createElement('h4', { style: { marginBottom: 8, fontSize: 13 } }, 'Final Standings'),
+            (season.standings || []).map((t, i) => React.createElement('div', { key: t.name, style: { fontSize: 13, padding: '2px 0' } },
+              `${i + 1}. `, React.createElement('span', { style: styles.teamDot(t.color) }), `${t.name} (${t.wins}-${t.losses})`
+            )),
+            season.awards ? React.createElement('div', { style: { marginTop: 12 } },
+              React.createElement('h4', { style: { marginBottom: 4, fontSize: 13 } }, 'Awards'),
+              ['mvp', 'dpoy', 'smoy', 'mip', 'roy'].map(key => {
+                const label = { mvp: 'MVP', dpoy: 'DPOY', smoy: '6MOY', mip: 'MIP', roy: 'ROY' }[key];
+                const winner = (season.awards[key] || [])[0];
+                return winner ? React.createElement('div', { key, style: { fontSize: 13 } }, `${label}: ${winner.name} (${winner.teamName})`) : null;
+              })
+            ) : null,
+            season.leaders ? React.createElement('div', { style: { marginTop: 12 } },
+              React.createElement('h4', { style: { marginBottom: 4, fontSize: 13 } }, 'Stat Leaders'),
+              ['pts', 'reb', 'ast', 'stl', 'blk'].map(cat => {
+                const label = { pts: 'PPG', reb: 'RPG', ast: 'APG', stl: 'SPG', blk: 'BPG' }[cat];
+                const top = (season.leaders[cat] || [])[0];
+                return top ? React.createElement('div', { key: cat, style: { fontSize: 13 } },
+                  `${label}: ${top.name} (${avg(top.stats[cat], top.stats.gp)})`
+                ) : null;
+              })
+            ) : null
+          ) : null
+        ))
+    );
+  }
+
+  // ─── Main Render ───
+  const tabs = [
+    { key: 'today', label: 'Today' },
+    { key: 'standings', label: 'Standings' },
+    { key: 'schedule', label: 'Schedule' },
+    { key: 'leaders', label: 'Leaders' },
+    { key: 'awards', label: 'Awards' },
+    { key: 'history', label: 'History' }
+  ];
+
+  function renderContent() {
+    if (subView) {
+      if (subView.type === 'team') return renderTeamDetail(subView.data);
+      if (subView.type === 'boxscore') return renderBoxScore(subView.data);
+    }
+    switch (view) {
+      case 'standings': return renderStandings();
+      case 'schedule': return renderSchedule();
+      case 'today': return renderToday();
+      case 'leaders': return renderLeaders();
+      case 'awards': return renderAwards();
+      case 'history': return renderHistory();
+      default: return renderToday();
+    }
+  }
+
+  const gamesPlayed = state.schedule.filter(g => g.result).length;
+  const totalGames = state.schedule.length;
+
+  return React.createElement('div', { style: styles.container },
+    React.createElement('div', { style: styles.header },
+      React.createElement('div', null,
+        React.createElement('span', { style: styles.headerTitle }, 'MDBA'),
+        React.createElement('span', { style: { fontSize: 12, marginLeft: 8, opacity: 0.8 } }, `Day ${state.currentDay} | ${gamesPlayed}/${totalGames} games`),
+        state.done ? React.createElement('span', { style: { marginLeft: 8, background: '#FFD700', color: '#333', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12 } }, '\uD83C\uDFC6 Complete') : null
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+        !state.done ? React.createElement('button', { style: styles.btn, onClick: simDay, title: 'Sim Day' }, '\u25B6 Day') : null,
+        !state.done ? React.createElement('button', { style: styles.btn, onClick: simWeek, title: 'Sim Week' }, '\u25B6\u25B6 Week') : null,
+        !state.done ? React.createElement('button', { style: styles.btn, onClick: simAll, title: 'Sim All' }, '\u23E9 All') : null,
+        React.createElement('button', { style: styles.btn, onClick: downloadSave, title: 'Download Save' }, '\u2B07'),
+        React.createElement('button', { style: styles.btn, onClick: () => startNewSeason(state.rosterData), title: 'New Season' }, '\u21BA New'),
+        React.createElement('label', { style: { ...styles.btn, display: 'inline-block' } },
+          '\uD83D\uDCC2',
+          React.createElement('input', { type: 'file', accept: '.xlsx,.xls', style: { display: 'none' }, onChange: handleFileUpload })
+        )
+      )
+    ),
+    React.createElement('div', { style: styles.tabs },
+      tabs.map(t => React.createElement('button', {
+        key: t.key,
+        style: styles.tab(view === t.key && !subView),
+        onClick: () => { setView(t.key); setSubView(null); }
+      }, t.label))
+    ),
+    renderContent()
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
