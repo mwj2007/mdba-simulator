@@ -752,11 +752,19 @@ function App(){
   var _logo=_(null),leagueLogo=_logo[0],setLeagueLogo=_logo[1];
   var lwid=React.useRef(null);
 
+  var initLock=React.useRef(false);
   React.useEffect(function(){
     db.ref(".info/connected").on("value",function(s2){setConn(!!s2.val())});
     gameRef.on("value",function(snap){
       var v=snap.val();
-      if(!v||v.version!==VERSION){gameRef.set(buildInit());return}
+      if(!v||v.version!==VERSION){
+        if(initLock.current)return;
+        initLock.current=true;
+        var init=buildInit();
+        setState(init);
+        gameRef.set(init).then(function(){initLock.current=false}).catch(function(){initLock.current=false});
+        return;
+      }
       if(v._wid&&v._wid===lwid.current){lwid.current=null;return}
       fixArrays(v);setState(v);
     });
