@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDBA Season Simulator v8</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#e6edf3;font-size:14px}
+::-webkit-scrollbar{height:6px;width:6px}::-webkit-scrollbar-thumb{background:#555;border-radius:3px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#161b22;color:#8b949e;padding:8px 6px;text-align:left;position:sticky;top:0;font-size:11px;font-weight:600;white-space:nowrap;user-select:none;border-bottom:1px solid #30363d}
+td{padding:6px;border-bottom:1px solid #21262d;white-space:nowrap}
+tbody tr:hover{background:#1c2128!important}
+button{cursor:pointer;font-family:inherit}
+.card{background:#161b22;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3);border:1px solid #30363d}
+.pill{padding:8px 18px;border-radius:20px;border:none;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.modal{background:#161b22;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid #30363d;color:#e6edf3}
+.headline{padding:10px 14px;border-left:4px solid #B22234;margin-bottom:6px;background:#1c2128;border-radius:0 8px 8px 0;font-size:13px}
+.inj{background:#da3633;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
+.plink{cursor:pointer;font-weight:600;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#58a6ff}
+.plink:hover{color:#B22234}
+.team-card{background:#161b22;border-radius:12px;padding:16px;cursor:pointer;border:2px solid #30363d;transition:all .15s}
+.team-card:hover{border-color:#B22234;transform:translateY(-2px);box-shadow:0 4px 16px rgba(178,34,52,0.3)}
+.str-pill{background:#1b3a25;color:#3fb950;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;margin:1px}
+.champ-banner{background:linear-gradient(135deg,#0d1117,#B22234);color:#fff;border-radius:16px;padding:40px 20px;text-align:center;margin-bottom:20px;border:1px solid #B22234}
+.salary{font-size:11px;color:#3fb950;font-weight:700}
+.conf-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.dynasty-badge{background:linear-gradient(135deg,#FFD700,#FFA500);color:#000;font-size:9px;padding:1px 6px;border-radius:4px;font-weight:800;margin-left:4px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.3s ease-out}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyBUwsU6Aj6sTP5Eyc-lSMtXluAReB5j-LU",authDomain:"mdba-simulator.firebaseapp.com",databaseURL:"https://mdba-simulator-default-rtdb.firebaseio.com",projectId:"mdba-simulator",storageBucket:"mdba-simulator.firebasestorage.app",messagingSenderId:"625372009483",appId:"1:625372009483:web:b3eaf88e76959b313b230e"});
+var db=firebase.database(),gameRef=db.ref("mdba8");
+var VERSION=8,PRIMARY="#B22234",ACCENT="#58a6ff",h=React.createElement;
+
+function R(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function RF(a,b){return Math.random()*(b-a)+a}
+function G(m,s){var u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function pick(a){return a[R(0,a.length-1)]}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
+function avg(v,g){return g>0?(v/g).toFixed(1):"0.0"}
+function pct(m,a){return a>0?(m/a*100).toFixed(1):"0.0"}
+function DC(o){return JSON.parse(JSON.stringify(o))}
+function htStr(i){return Math.floor(i/12)+"'"+i%12+'"'}
+function salStr(s){return s>=1000000?"$"+((s/1000000).toFixed(1))+"M":"$"+(s/1000).toFixed(0)+"K"}
+function seededRandom(seed){var x=Math.sin(seed)*10000;return x-Math.floor(x)}
+function seededR(seed,a,b){return Math.floor(seededRandom(seed)*(b-a+1))+a}
+function seededPick(seed,a){return a[seededR(seed,0,a.length-1)]}
+
+// Data pools
+var CITIES=["Atlanta, GA","Chicago, IL","Los Angeles, CA","New York, NY","Houston, TX","Miami, FL","Detroit, MI","Dallas, TX","Seattle, WA","Denver, CO","Phoenix, AZ","Portland, OR","Charlotte, NC","Milwaukee, WI","Kansas City, MO","Las Vegas, NV","Boston, MA","Philadelphia, PA","Memphis, TN","Indianapolis, IN","San Antonio, TX","Sacramento, CA","Oakland, CA","Minneapolis, MN","Cleveland, OH","Toronto, ON","London, UK","Paris, France","Lagos, Nigeria","Douala, Cameroon","Belgrade, Serbia","Ljubljana, Slovenia","Melbourne, Australia","Kinshasa, DRC","Dakar, Senegal","Santo Domingo, DR","Montreal, QC","Winnipeg, MB","Bamako, Mali","Athens, Greece","Brooklyn, NY","Orlando, FL","Oklahoma City, OK","Salt Lake City, UT"];
+var COLLEGES=["Duke","Kentucky","North Carolina","Kansas","UCLA","Gonzaga","Michigan","Villanova","Arizona","Texas","Baylor","Auburn","Houston","Tennessee","Arkansas","Oregon","UConn","Alabama","Michigan State","Georgetown","Memphis","LSU","Florida","Indiana","Syracuse","Ohio State","Louisville","Virginia","Creighton","Overtime Elite","G League Ignite","NBA Academy Africa","AUS Institute of Sport","Real Madrid Academy","Barcelona Academy"];
+var SPONSORS=["Nike","Adidas","Jordan Brand","Under Armour","New Balance","Puma","Reebok","Li-Ning","Anta","Peak","361","Converse","None"];
+var SHOE_BRANDS=["Nike","Adidas","Jordan","Under Armour","New Balance","Puma","Reebok","Li-Ning","Anta","Peak","Converse"];
+var CARS=["Lamborghini Urus","Ferrari 488","Rolls Royce Cullinan","Mercedes G-Wagon","Porsche 911","BMW M8","McLaren 720S","Range Rover","Bentley Continental","Tesla Model X","Audi RS7","Dodge Hellcat"];
+var FOODS=["Chicken Wings","Sushi","Tacos","Pizza","Steak","Pasta","Jollof Rice","Acai Bowl","Chipotle","Chick-fil-A","Hibachi","Ramen","BBQ Ribs","Salmon","Curry","Pad Thai","Burgers","Oxtail","Plantains","Smoothie Bowls"];
+var FN=["Jaylen","Marcus","Devonte","Tyrese","Cam","Zaire","Jaden","Keegan","Tre","Malik","Xavier","Kobe","Devin","Andre","Jamal","Donovan","Cade","Scottie","Paolo","Victor","Amen","Ausar","Bronny","Shaedon","Keyonte","Gradey","Reed","Dereck","Bilal","Collin","Anfernee","Scoot","Brandon","Terrence","Jabari","Tari","Luka","Shai","Joel","Damian","Trae","Ja","Evan","Keldon","Coby","Immanuel","Deni","Obi","Ayo","Herb","Ziaire","Josh","Quentin","Caleb","Onyeka","Kofi","Kai","Jett","Keon","Sharife","Moses","Alperen","Franz","Chet","Bennedict","Mark","TyTy","Ochai","Talen","Bryce","Jarace","Ousmane","Rayan","Nikola","Giannis","Emoni","Zach","Nolan","Omari","Trey","DeAndre","Keshon","Amari","Jace","Niko","Khalil","Dillon","Myles","Darius","RJ","Zion","Lamelo","Mikal","Desmond","Bam","Jrue","Derrick","Kyrie","Anthony","Russell","Jordan","Blake","Chris","DeMar","Pascal","Julius","Jarrett","Domantas","Tyus","Bones","Davion","Matisse","Nassir","Kenyon","Isaiah","Wendell","Patrick","Marvin","Jalen","Walker","Cameron","Elijah","Mason","Tyler","Calvin","Lorenzo","Dante","Stefan","Pierre","Rico","Leandro","Santino","Cedric","Grant","Wayne"];
+var LN=["Johnson","Williams","Brown","Jones","Davis","Thompson","Jackson","Robinson","Harris","Clark","Lewis","Walker","Hall","Allen","Young","King","Wright","Scott","Green","Baker","Adams","Nelson","Carter","Mitchell","Turner","Phillips","Campbell","Parker","Evans","Edwards","Collins","Stewart","Morris","Rogers","Reed","Cook","Morgan","Bell","Murphy","Bailey","Cooper","Richardson","Howard","Ward","Peterson","Gray","James","Watson","Brooks","Kelly","Sanders","Price","Bennett","Wood","Barnes","Ross","Henderson","Coleman","Jenkins","Perry","Powell","Patterson","Hughes","Washington","Butler","Simmons","Foster","Bryant","Alexander","Russell","Griffin","Hayes","Myers","Ford","Hamilton","Graham","Sullivan","Wallace","Woods","West","Jordan","Owens","Reynolds","Fisher","Ellis","Harrison","Gibson","Marshall","Gordon","Warren","Diallo","Coulibaly","Ndiaye","Traore","Okafor","Adebayo","Sengun","Holmgren","Wembanyama","Banchero","Sharpe","Mobley","Cunningham","Wagner","Duarte","Kispert","Moody","McBride","Thornton","Whitmore","Hendricks","Filipowski","Castle","Risacher","Sarr"];
+var STRENGTHS={PG:["Elite court vision","Shifty handles","Pull-up three","Lockdown D","PnR maestro","Flashy passer","Quick first step","Clutch gene","Deep range","Transition general","Floater game","Crossover king","Steal artist"],SG:["Lights-out shooter","Catch & shoot","Shot creator","Two-way wing","Slashing scorer","Midrange assassin","Corner sniper","Athletic finisher","Microwave scorer","Fadeaway artist","Stepback king","Free throw machine"],SF:["Versatile scorer","Lockdown defender","Point forward","Poster dunker","Switchable wing","Tough shot maker","Transition beast","3-and-D specialist","Physical finisher","Euro step master","Triple-double threat","Isolation scorer"],PF:["Stretch four","Post moves","Rim protector","Glass cleaner","Pick & pop","Face-up game","Athletic freak","Power dunker","Lob threat","Spin move master","Drop step","Putback king"],C:["Dominant post game","Elite rim protector","Rebounding machine","PnR finisher","Passing big","Stretch five","Paint beast","Shot-block anchor","Hook shot","Double-double machine","Tip-in artist","Outlet passer"]};
+var WEAKNESSES=["Turnover prone","Inconsistent shooter","Foul trouble","Poor FT shooter","Limited range","Slow lateral movement","Ball stopper","Defensive liability","Low IQ","Injury history","Poor conditioning","One-dimensional"];
+var FUN_FACTS=["Has a pet parrot","Plays piano","Speaks 3 languages","Collects sneakers (500+ pairs)","Amateur chess champion","Streams on Twitch","Owns a clothing line","Trains MMA in offseason","Undefeated in rock-paper-scissors","Can solve a Rubik's cube in under a minute","Eats cereal before every game","Has never lost a game of HORSE","Childhood pen pals with a NBA player","Once scored 70 in a high school game","Allergic to grass but plays anyway","Has a twin who plays overseas","Former track star","Ambidextrous","Born on an NBA game day","Plays guitar in a band","Won a hot dog eating contest","Secret chef - runs a food blog","Has 12 dogs","Once met the president","Freestyle raps in the locker room"];
+var HT={PG:[73,77],SG:[75,79],SF:[77,81],PF:[79,82],C:[81,86]};
+var WT={PG:[180,205],SG:[190,215],SF:[205,230],PF:[220,250],C:[240,275]};
+var PB={PG:{reb:3.8,ast:7.5,blk:0.2,stl:1.4},SG:{reb:4.0,ast:4.0,blk:0.3,stl:1.1},SF:{reb:6.0,ast:3.5,blk:0.5,stl:1.0},PF:{reb:8.5,ast:2.8,blk:0.9,stl:0.7},C:{reb:11.0,ast:2.5,blk:1.5,stl:0.5}};
+
+// Conference assignments
+var EAST_TEAMS=["NEW YORK LAZERS","BOSTON STARS","MIAMI KNIGHTS","MILWAUKEE COMMANDERS","DETROIT ROCKETS","PHILADELPHIA THUNDER","ATLANTA FLAMES","CHARLOTTE KINGS","CHICAGO FURY","TORONTO TITANS","WASHINGTON EAGLES","INDIANA MOTORS","ORLANDO ECLIPSE","BROOKLYN STORM","CLEVELAND IRONMEN"];
+var WEST_TEAMS=["SEATTLE STINGRAYS","LAS VEGAS ACES","KANSAS CITY MONARCHS","PORTLAND WOLVES","DENVER ALTITUDE","PHOENIX SCORPIONS","DALLAS OUTLAWS","HOUSTON STALLIONS","LOS ANGELES VIPERS","SACRAMENTO LIONS","SAN ANTONIO COYOTES","MEMPHIS BLUES","MINNESOTA FROST","OKLAHOMA CITY SURGE","UTAH PIONEERS"];
+
+function getConf(name){return EAST_TEAMS.indexOf(name)>=0?"EAST":"WEST"}
+
+function genName(used){for(var i=0;i<200;i++){var n=pick(FN).toUpperCase()+" "+pick(LN).toUpperCase();if(!used||!used.has(n))return n}return pick(FN).toUpperCase()+" "+pick(LN).toUpperCase()+R(1,99)}
+function genSalary(ovr,age){
+  var base=ovr>=95?RF(40,55):ovr>=90?RF(30,42):ovr>=85?RF(20,32):ovr>=80?RF(12,22):ovr>=75?RF(6,14):ovr>=70?RF(3,8):RF(1,4);
+  if(age<=22)base*=0.6;
+  return Math.round(base*1000000);
+}
+function genContract(ovr,age){return{salary:genSalary(ovr,age),years:ovr>=85?R(3,5):ovr>=75?R(2,4):R(1,3)}}
+function emptyStats(){return{gp:0,pts:0,reb:0,oreb:0,dreb:0,ast:0,stl:0,blk:0,to:0,pf:0,fgm:0,fga:0,tpm:0,tpa:0,ftm:0,fta:0,min:0}}
+
+function makePlayer(name,pos,age,ovr,ht2,wt2,info){
+  var c=genContract(ovr,age);
+  return{name:name,pos:pos,age:age,ovr:ovr,prevOvr:ovr,ovrHistory:[ovr],ht:ht2||R(HT[pos][0],HT[pos][1]),wt:wt2||R(WT[pos][0],WT[pos][1]),strengths:[pick(STRENGTHS[pos]||STRENGTHS.SF),pick(STRENGTHS[pos]||STRENGTHS.SF)].concat(ovr>=85?[pick(STRENGTHS[pos]||STRENGTHS.SF)]:[]),weakness:pick(WEAKNESSES),info:info||"",stats:emptyStats(),injury:null,salary:c.salary,contractYrs:c.years,college:pick(COLLEGES),birthplace:pick(CITIES),sponsor:pick(SPONSORS),favFood:pick(FOODS),funFact:pick(FUN_FACTS),car:pick(CARS),shoeBrand:pick(SHOE_BRANDS)}
+}
+
+// Team meta for all 30 teams
+var TEAM_META={
+"SEATTLE STINGRAYS":{arena:"Pacific Arena",owner:"Marcus Chen",city:"Seattle",est:2020,emoji:"\uD83E\uDD88",motto:"Strike from the deep",conf:"WEST"},
+"MILWAUKEE COMMANDERS":{arena:"Command Center",owner:"David Okonkwo",city:"Milwaukee",est:2020,emoji:"\u2694\uFE0F",motto:"Lead. Conquer. Repeat.",conf:"EAST"},
+"MIAMI KNIGHTS":{arena:"Knight Stadium",owner:"Isabella Rodriguez",city:"Miami",est:2020,emoji:"\uD83D\uDEE1\uFE0F",motto:"Honor in battle",conf:"EAST"},
+"BOSTON STARS":{arena:"Constellation Center",owner:"James O'Brien",city:"Boston",est:2020,emoji:"\u2B50",motto:"Shine the brightest",conf:"EAST"},
+"DETROIT ROCKETS":{arena:"Launch Pad Arena",owner:"Andre Williams",city:"Detroit",est:2020,emoji:"\uD83D\uDE80",motto:"Ignite the city",conf:"EAST"},
+"LAS VEGAS ACES":{arena:"The Strip Arena",owner:"Tony Marchetti",city:"Las Vegas",est:2020,emoji:"\uD83C\uDCA1",motto:"Always all in",conf:"WEST"},
+"KANSAS CITY MONARCHS":{arena:"Crown Court",owner:"Ray Jackson",city:"Kansas City",est:2020,emoji:"\uD83D\uDC51",motto:"Royalty on the court",conf:"WEST"},
+"NEW YORK LAZERS":{arena:"Beam Garden",owner:"Sarah Chen",city:"New York",est:2020,emoji:"\u26A1",motto:"Electrify the game",conf:"EAST"},
+"CHICAGO FURY":{arena:"Fury Forum",owner:"Michael Torres",city:"Chicago",est:2022,emoji:"\uD83D\uDD25",motto:"Burn it down",conf:"EAST"},
+"LOS ANGELES VIPERS":{arena:"Venom Arena",owner:"Kevin Park",city:"Los Angeles",est:2022,emoji:"\uD83D\uDC0D",motto:"Silent but deadly",conf:"WEST"},
+"ATLANTA FLAMES":{arena:"Inferno Center",owner:"Darnell Washington",city:"Atlanta",est:2022,emoji:"\uD83D\uDD25",motto:"Rise from the ashes",conf:"EAST"},
+"HOUSTON STALLIONS":{arena:"Stampede Arena",owner:"Carlos Gutierrez",city:"Houston",est:2022,emoji:"\uD83D\uDC0E",motto:"Unstoppable force",conf:"WEST"},
+"PHILADELPHIA THUNDER":{arena:"Storm Center",owner:"Lisa Chang",city:"Philadelphia",est:2022,emoji:"\u26C8\uFE0F",motto:"Shock the world",conf:"EAST"},
+"PHOENIX SCORPIONS":{arena:"Desert Dome",owner:"Ahmed Hassan",city:"Phoenix",est:2022,emoji:"\uD83E\uDD82",motto:"Sting at will",conf:"WEST"},
+"DALLAS OUTLAWS":{arena:"Frontier Arena",owner:"Robert McAllister",city:"Dallas",est:2022,emoji:"\uD83E\uDD20",motto:"No rules. No limits.",conf:"WEST"},
+"PORTLAND WOLVES":{arena:"Wolf Den",owner:"Nathan Blackwood",city:"Portland",est:2022,emoji:"\uD83D\uDC3A",motto:"Run with the pack",conf:"WEST"},
+"DENVER ALTITUDE":{arena:"Summit Arena",owner:"Elena Vasquez",city:"Denver",est:2022,emoji:"\uD83C\uDFD4\uFE0F",motto:"Above it all",conf:"WEST"},
+"CHARLOTTE KINGS":{arena:"Royal Court",owner:"Terrence Bridges",city:"Charlotte",est:2022,emoji:"\u265A",motto:"Crown them",conf:"EAST"},
+"TORONTO TITANS":{arena:"Titan Tower",owner:"Rajesh Patel",city:"Toronto",est:2024,emoji:"\uD83C\uDFDB\uFE0F",motto:"Built different",conf:"EAST"},
+"WASHINGTON EAGLES":{arena:"Capitol Arena",owner:"Diana Monroe",city:"Washington D.C.",est:2024,emoji:"\uD83E\uDD85",motto:"Soar above",conf:"EAST"},
+"INDIANA MOTORS":{arena:"Speedway Center",owner:"Frank Miller",city:"Indianapolis",est:2024,emoji:"\uD83C\uDFCE\uFE0F",motto:"Full throttle",conf:"EAST"},
+"ORLANDO ECLIPSE":{arena:"Eclipse Dome",owner:"Maria Santos",city:"Orlando",est:2024,emoji:"\uD83C\uDF11",motto:"Block out the sun",conf:"EAST"},
+"BROOKLYN STORM":{arena:"Thunder Dome",owner:"Jay Richardson",city:"Brooklyn",est:2024,emoji:"\u26C8\uFE0F",motto:"Unleash the storm",conf:"EAST"},
+"CLEVELAND IRONMEN":{arena:"Steel Arena",owner:"Victor Kozlov",city:"Cleveland",est:2024,emoji:"\uD83E\uDDBE",motto:"Forged in fire",conf:"EAST"},
+"SACRAMENTO LIONS":{arena:"Pride Arena",owner:"Mei Lin",city:"Sacramento",est:2024,emoji:"\uD83E\uDD81",motto:"Heart of a lion",conf:"WEST"},
+"SAN ANTONIO COYOTES":{arena:"Canyon Court",owner:"Miguel Hernandez",city:"San Antonio",est:2024,emoji:"\uD83D\uDC3A",motto:"Howl at the moon",conf:"WEST"},
+"MEMPHIS BLUES":{arena:"Blues Hall",owner:"Tyrone Jackson",city:"Memphis",est:2024,emoji:"\uD83C\uDFB5",motto:"Play your heart out",conf:"WEST"},
+"MINNESOTA FROST":{arena:"Ice Palace",owner:"Erik Johansson",city:"Minneapolis",est:2024,emoji:"\u2744\uFE0F",motto:"Cold as ice",conf:"WEST"},
+"OKLAHOMA CITY SURGE":{arena:"Surge Center",owner:"Billy Dean",city:"Oklahoma City",est:2024,emoji:"\u26A1",motto:"Electric energy",conf:"WEST"},
+"UTAH PIONEERS":{arena:"Pioneer Park",owner:"Thomas Young",city:"Salt Lake City",est:2024,emoji:"\uD83C\uDFD5\uFE0F",motto:"Blaze the trail",conf:"WEST"}
+};
+
+var COLORS2={"SEATTLE STINGRAYS":"#006D75","MILWAUKEE COMMANDERS":"#2E4057","MIAMI KNIGHTS":"#D4213D","BOSTON STARS":"#1B4D3E","DETROIT ROCKETS":"#C41E3A","LAS VEGAS ACES":"#C4975C","KANSAS CITY MONARCHS":"#4169E1","NEW YORK LAZERS":"#FF6600","CHICAGO FURY":"#E25822","LOS ANGELES VIPERS":"#6B2D8B","ATLANTA FLAMES":"#CF3339","HOUSTON STALLIONS":"#003366","PHILADELPHIA THUNDER":"#FFB800","PHOENIX SCORPIONS":"#8B0000","DALLAS OUTLAWS":"#4A3728","PORTLAND WOLVES":"#2D5A27","DENVER ALTITUDE":"#5B9BD5","CHARLOTTE KINGS":"#7B2D8E","TORONTO TITANS":"#1E3A5F","WASHINGTON EAGLES":"#B8860B","INDIANA MOTORS":"#C41E3A","ORLANDO ECLIPSE":"#1C1C2E","BROOKLYN STORM":"#4A90D9","CLEVELAND IRONMEN":"#8B4513","SACRAMENTO LIONS":"#DAA520","SAN ANTONIO COYOTES":"#556B2F","MEMPHIS BLUES":"#4682B4","MINNESOTA FROST":"#87CEEB","OKLAHOMA CITY SURGE":"#FF8C00","UTAH PIONEERS":"#8B6914"};
+
+// Original 18 team rosters
+var ROSTERS={
+"SEATTLE STINGRAYS":[{n:"JALEN MILES",p:"PG",a:27,o:86,h:76,w:202,i:"Best handles in MDBA, great passer"},{n:"ISAIAH CARTER",p:"SG",a:20,o:90,h:77,w:195,i:"Elite shooter and high IQ"},{n:"BRYCE HARRIS",p:"SF",a:25,o:80,h:77,w:208,i:"Spot up shooter"},{n:"MILES WILLIAMS",p:"PF",a:20,o:83,h:80,w:220,i:"Athletic, quick first step"},{n:"JULIAN WRIGHT",p:"C",a:26,o:80,h:83,w:245,i:"Good post moves"},{n:"COLE RIVER",p:"SF",a:30,o:80,h:78,w:215,i:"Midrange specialist"}],
+"MILWAUKEE COMMANDERS":[{n:"STEVE WRIGHT",p:"PG",a:25,o:81,h:75,w:199,i:"Clean layups"},{n:"LAMAR WALLACE",p:"SG",a:25,o:72,h:78,w:210,i:"Corner three specialist"},{n:"DESMOND KING",p:"SF",a:21,o:87,h:81,w:220,i:"Plays like LeBron"},{n:"TOBIAS SHAW",p:"PF",a:30,o:76,h:80,w:235,i:"Good passing big"},{n:"JAXON GAZEL",p:"C",a:19,o:85,h:84,w:250,i:"Clean three, slow but dominant"},{n:"DORIAN MCOY",p:"SF",a:27,o:79,h:79,w:218,i:"Best midrange in league"}],
+"MIAMI KNIGHTS":[{n:"CAMERON BROOKS",p:"PG",a:25,o:91,h:75,w:198,i:"Shifty shooter, elite passing & IQ"},{n:"ELIJAH HAYES",p:"SG",a:23,o:78,h:77,w:202,i:"Clean corner three"},{n:"DARIUS WASHINGTON",p:"SF",a:28,o:96,h:81,w:225,i:"Great dunker, clean midrange"},{n:"NIKOLAS D'ANGELLO",p:"PF",a:22,o:76,h:80,w:230,i:"Good in the post"},{n:"DEVIN KNOX",p:"C",a:26,o:84,h:83,w:248,i:"Great rebounder"},{n:"CALEB JOHNSON",p:"PG",a:19,o:80,h:74,w:190,i:"Court vision and shooting"}],
+"BOSTON STARS":[{n:"ANTHONY TOMAS",p:"PG",a:23,o:82,h:79,w:200,i:"Good dunker and passer"},{n:"TOM STUNN",p:"SG",a:28,o:72,h:78,w:199,i:"Fadeaway specialist"},{n:"EZEKIEL DOME",p:"SF",a:24,o:76,h:80,w:218,i:"Athletic dunker"},{n:"ROYCE TUCKER",p:"PF",a:30,o:93,h:81,w:240,i:"Insane three ball, post fade master"},{n:"NICOH POKE",p:"C",a:26,o:77,h:84,w:252,i:"Passing and post game"},{n:"KEVIN WALKER",p:"PF",a:19,o:79,h:80,w:225,i:"Great midrange"}],
+"DETROIT ROCKETS":[{n:"MASON BLUNT",p:"PG",a:26,o:83,h:74,w:185,i:"Best passer in MDBA"},{n:"ZION KING",p:"SG",a:31,o:75,h:77,w:197,i:"Good passing guard"},{n:"KELLEN MOORE",p:"SF",a:29,o:81,h:80,w:210,i:"Knockdown three shooter"},{n:"NILES MCGEE",p:"PF",a:20,o:95,h:82,w:235,i:"Plays like KD"},{n:"SAM CHARRIS",p:"C",a:31,o:82,h:84,w:255,i:"Post move master"},{n:"TROY BENSON",p:"C",a:21,o:78,h:83,w:248,i:"Strong rebounder"}],
+"LAS VEGAS ACES":[{n:"CURTIS MALONE",p:"PG",a:21,o:80,h:76,w:189,i:"Deep three ball"},{n:"KADE ELLINGTON",p:"SG",a:22,o:84,h:78,w:205,i:"Elite shooter"},{n:"ANDREW PETROVIC",p:"SF",a:23,o:78,h:80,w:210,i:"Midrange specialist"},{n:"MALIK BELLINI",p:"PF",a:22,o:88,h:81,w:230,i:"Best dunker in league"},{n:"IVAN FOX",p:"C",a:26,o:81,h:83,w:250,i:"Plays like Jokic"},{n:"METEO CRUZ",p:"SG",a:23,o:76,h:78,w:200,i:"Unorthodox but effective shooter"}],
+"KANSAS CITY MONARCHS":[{n:"TYLER CORE",p:"PG",a:22,o:79,h:75,w:197,i:"Knockdown three shooter"},{n:"CALVIN CUNNINGHAM",p:"SG",a:19,o:90,h:77,w:210,i:"Elite dunker, fadeaway and midrange"},{n:"SAM DUFFE",p:"SF",a:30,o:71,h:79,w:215,i:"Midrange specialist"},{n:"JAXON PEIRCE",p:"PF",a:19,o:86,h:82,w:225,i:"Plays like Wemby"},{n:"DOMINIC WELLS",p:"C",a:20,o:86,h:85,w:265,i:"Shaq-like dominance"},{n:"MAX WALKER",p:"PF",a:19,o:73,h:80,w:228,i:"Power dunker"}],
+"NEW YORK LAZERS":[{n:"MILES ROBINSON",p:"PG",a:19,o:85,h:75,w:187,i:"Pure shooter"},{n:"ANTHONY LEWIS",p:"SG",a:19,o:87,h:77,w:200,i:"Slashing scorer"},{n:"LOGAN TUBBS",p:"SF",a:21,o:76,h:79,w:241,i:"Catch and shoot specialist"},{n:"ETHAN BROWN",p:"PF",a:22,o:77,h:80,w:225,i:"Defensive specialist"},{n:"XAVIER THOMPSON",p:"C",a:19,o:88,h:84,w:255,i:"Elite shot blocker"}],
+"CHICAGO FURY":[{n:"DAMIEN ROSS",p:"PG",a:24,o:89,h:75,w:195,i:"Electric scorer"},{n:"JAYLEN PIERCE",p:"SG",a:22,o:82,h:77,w:205,i:"Lights out shooter"},{n:"MARCUS COLE",p:"SF",a:26,o:84,h:80,w:220,i:"Two-way beast"},{n:"TERRENCE FORD",p:"PF",a:23,o:79,h:81,w:235,i:"Athletic freak"},{n:"OMAR HASSAN",p:"C",a:25,o:81,h:84,w:260,i:"Paint dominator"},{n:"RICKY TRAN",p:"PG",a:21,o:74,h:73,w:180,i:"Quick backup"}],
+"LOS ANGELES VIPERS":[{n:"KENDRICK SHAW",p:"PG",a:27,o:88,h:76,w:200,i:"Flashy playmaker"},{n:"DEVON PRICE",p:"SG",a:23,o:85,h:78,w:210,i:"Catch and shoot sniper"},{n:"RASHEED WILLIAMS",p:"SF",a:25,o:80,h:79,w:215,i:"Versatile wing"},{n:"CHRIS OKONKWO",p:"PF",a:22,o:83,h:81,w:240,i:"High-flying dunker"},{n:"NIKOLAI PETROV",p:"C",a:28,o:79,h:85,w:270,i:"Old-school center"},{n:"ANDRE MITCHELL",p:"SG",a:20,o:76,h:77,w:195,i:"Young shooter"}],
+"ATLANTA FLAMES":[{n:"JAYLON CARTER",p:"PG",a:23,o:86,h:74,w:190,i:"Explosive scorer"},{n:"TERRELL DAVIS",p:"SG",a:25,o:81,h:78,w:208,i:"Knockdown midrange"},{n:"DESHAWN HARRIS",p:"SF",a:24,o:84,h:80,w:225,i:"Physical wing"},{n:"MALIK JOHNSON",p:"PF",a:21,o:80,h:81,w:235,i:"Rim runner"},{n:"KOFI MENSAH",p:"C",a:26,o:78,h:84,w:255,i:"Shot blocker"},{n:"TREY SIMMONS",p:"PG",a:20,o:73,h:73,w:178,i:"Developing point guard"}],
+"HOUSTON STALLIONS":[{n:"DARIUS MITCHELL",p:"PG",a:26,o:87,h:76,w:198,i:"Floor general"},{n:"KEVIN ROSS",p:"SG",a:24,o:83,h:77,w:205,i:"Sharpshooter"},{n:"JAMAL FOSTER",p:"SF",a:27,o:79,h:79,w:218,i:"Defensive stopper"},{n:"ZION DAVIS",p:"PF",a:22,o:85,h:82,w:242,i:"Athletic forward"},{n:"MARCUS BELL",p:"C",a:25,o:80,h:83,w:258,i:"Strong inside"},{n:"TYLER JAMES",p:"SG",a:21,o:75,h:76,w:195,i:"Developing guard"}],
+"PHILADELPHIA THUNDER":[{n:"ISAIAH FORD",p:"PG",a:25,o:90,h:75,w:195,i:"Elite playmaker"},{n:"RASHAD GREEN",p:"SG",a:23,o:82,h:78,w:210,i:"Two-way guard"},{n:"TREVOR HAYES",p:"SF",a:26,o:78,h:80,w:220,i:"Tough defender"},{n:"BRYSON CLARK",p:"PF",a:24,o:84,h:81,w:240,i:"Stretch big"},{n:"DONTE RIVERS",p:"C",a:27,o:81,h:84,w:265,i:"Rim protector"},{n:"JACE HALL",p:"PG",a:20,o:74,h:74,w:185,i:"Quick backup"}],
+"PHOENIX SCORPIONS":[{n:"KHALIL BROWN",p:"PG",a:24,o:85,h:74,w:188,i:"Crafty scorer"},{n:"DEVIN SCOTT",p:"SG",a:22,o:84,h:78,w:205,i:"Smooth shooter"},{n:"JABARI MOORE",p:"SF",a:25,o:81,h:80,w:222,i:"Athletic wing"},{n:"TREVON JAMES",p:"PF",a:23,o:79,h:81,w:238,i:"High motor"},{n:"AMIR JOHNSON",p:"C",a:26,o:80,h:83,w:252,i:"Anchor inside"},{n:"NIKO CAMPBELL",p:"SG",a:20,o:73,h:76,w:195,i:"Young talent"}],
+"DALLAS OUTLAWS":[{n:"MAVERICK STONE",p:"PG",a:26,o:87,h:76,w:200,i:"Fearless leader"},{n:"COLE JACKSON",p:"SG",a:23,o:83,h:78,w:208,i:"Sharpshooter"},{n:"DWAYNE FOSTER",p:"SF",a:25,o:80,h:80,w:218,i:"All-around forward"},{n:"XAVIER BANKS",p:"PF",a:24,o:82,h:81,w:235,i:"Power forward"},{n:"JULIUS WRIGHT",p:"C",a:27,o:79,h:84,w:260,i:"Paint beast"},{n:"TROY ALLEN",p:"PG",a:21,o:75,h:74,w:185,i:"Speed demon"}],
+"PORTLAND WOLVES":[{n:"ASHER WOLFE",p:"PG",a:25,o:86,h:75,w:195,i:"Pack leader"},{n:"NATE RIVERS",p:"SG",a:23,o:82,h:77,w:205,i:"Sniper"},{n:"CASEY BARRETT",p:"SF",a:26,o:79,h:80,w:220,i:"Physical wing"},{n:"DOMINIC GRANT",p:"PF",a:24,o:83,h:81,w:240,i:"Versatile big"},{n:"BORIS KOZLOV",p:"C",a:27,o:80,h:85,w:268,i:"International big"},{n:"JALEN TORRES",p:"SG",a:20,o:74,h:76,w:195,i:"High ceiling prospect"}],
+"DENVER ALTITUDE":[{n:"SKY WALKER",p:"PG",a:24,o:88,h:76,w:198,i:"Mile high maestro"},{n:"ELIJAH CHEN",p:"SG",a:22,o:84,h:78,w:205,i:"Knockdown shooter"},{n:"KARIM DIALLO",p:"SF",a:25,o:81,h:80,w:225,i:"Two-way force"},{n:"JACKSON REED",p:"PF",a:23,o:80,h:81,w:238,i:"Skilled big"},{n:"ALEKSEI VOLKOV",p:"C",a:27,o:79,h:85,w:272,i:"Euro big man"},{n:"MILES CHAPMAN",p:"PG",a:20,o:75,h:74,w:185,i:"Young playmaker"}],
+"CHARLOTTE KINGS":[{n:"PRINCE ADEYEMI",p:"PG",a:25,o:87,h:76,w:200,i:"Royal court vision"},{n:"JAMES WHITFIELD",p:"SG",a:24,o:83,h:78,w:208,i:"Scoring guard"},{n:"DEREK MASON",p:"SF",a:26,o:80,h:80,w:222,i:"Veteran wing"},{n:"OMAR WILLIAMS",p:"PF",a:23,o:82,h:81,w:240,i:"Athletic big"},{n:"YUSUF BARRY",p:"C",a:27,o:78,h:84,w:258,i:"Shot blocker"},{n:"TREVON MILLS",p:"SG",a:21,o:74,h:77,w:198,i:"Developing scorer"}]
+};
+
+// New team roster data generated with seeds for consistency
+var NEW_TEAM_SEEDS={
+"TORONTO TITANS":{seed:1001,ovrs:[84,81,79,77,82,73]},
+"WASHINGTON EAGLES":{seed:1002,ovrs:[83,80,78,76,81,72]},
+"INDIANA MOTORS":{seed:1003,ovrs:[82,79,77,80,78,71]},
+"ORLANDO ECLIPSE":{seed:1004,ovrs:[81,83,76,78,77,72]},
+"BROOKLYN STORM":{seed:1005,ovrs:[85,82,80,77,79,74]},
+"CLEVELAND IRONMEN":{seed:1006,ovrs:[80,78,82,76,79,73]},
+"SACRAMENTO LIONS":{seed:1007,ovrs:[83,80,78,81,77,72]},
+"SAN ANTONIO COYOTES":{seed:1008,ovrs:[82,84,77,79,80,73]},
+"MEMPHIS BLUES":{seed:1009,ovrs:[84,81,79,77,83,74]},
+"MINNESOTA FROST":{seed:1010,ovrs:[81,79,83,78,80,72]},
+"OKLAHOMA CITY SURGE":{seed:1011,ovrs:[86,80,78,77,81,73]},
+"UTAH PIONEERS":{seed:1012,ovrs:[80,82,77,79,78,71]}
+};
+
+function generateNewTeamRoster(teamName){
+  var td=NEW_TEAM_SEEDS[teamName];
+  if(!td)return[];
+  var positions=["PG","SG","SF","PF","C","SG"];
+  var roster=[];
+  var seed=td.seed;
+  for(var i=0;i<6;i++){
+    var s=seed+i*137;
+    var pos=positions[i];
+    var ovr=td.ovrs[i];
+    var age=seededR(s+1,20,28);
+    var ht2=seededR(s+2,HT[pos][0],HT[pos][1]);
+    var wt2=seededR(s+3,WT[pos][0],WT[pos][1]);
+    var fn2=FN[Math.abs(seededR(s+4,0,FN.length-1))];
+    var ln2=LN[Math.abs(seededR(s+5,0,LN.length-1))];
+    var nm=fn2.toUpperCase()+" "+ln2.toUpperCase();
+    var descs=["Talented young player","Versatile scorer","Defensive anchor","Athletic specimen","Developing star","High energy reserve"];
+    roster.push({n:nm,p:pos,a:age,o:ovr,h:ht2,w:wt2,i:descs[i]});
+  }
+  return roster;
+}
+
+function initTeams(){
+  var teams=[];
+  var origNames=Object.keys(ROSTERS);
+  var usedNames=new Set();
+
+  // Original 18 teams
+  origNames.forEach(function(name){
+    var color=COLORS2[name]||"#666";
+    var meta=TEAM_META[name]||{};
+    var players=ROSTERS[name].map(function(r){return makePlayer(r.n,r.p,r.a,r.o,r.h,r.w,r.i)}).sort(function(a,b){return b.ovr-a.ovr});
+    players.forEach(function(p){usedNames.add(p.name)});
+    var totalSal=players.reduce(function(s,p){return s+p.salary},0);
+    teams.push({name:name,color:color,players:players,wins:0,losses:0,arena:meta.arena,owner:meta.owner,city:meta.city,est:meta.est,emoji:meta.emoji,motto:meta.motto,capSpace:140000000-totalSal,championships:0,conf:getConf(name)});
+  });
+
+  // 12 new expansion teams
+  var newTeamNames=Object.keys(NEW_TEAM_SEEDS);
+  newTeamNames.forEach(function(name){
+    var color=COLORS2[name]||"#666";
+    var meta=TEAM_META[name]||{};
+    var rosterData=generateNewTeamRoster(name);
+    var players=rosterData.map(function(r){
+      // ensure unique names
+      var nm=r.n;
+      if(usedNames.has(nm)){nm=nm+R(1,99)}
+      usedNames.add(nm);
+      return makePlayer(nm,r.p,r.a,r.o,r.h,r.w,r.i);
+    }).sort(function(a,b){return b.ovr-a.ovr});
+    var totalSal=players.reduce(function(s,p){return s+p.salary},0);
+    teams.push({name:name,color:color,players:players,wins:0,losses:0,arena:meta.arena,owner:meta.owner,city:meta.city,est:meta.est,emoji:meta.emoji,motto:meta.motto,capSpace:140000000-totalSal,championships:0,conf:getConf(name)});
+  });
+
+  return teams;
+}
+
+// Schedule: 82 games, more intra-conference
+function genSchedule(teams){
+  var n=teams.length,pairs=[],counts=new Array(n).fill(0);
+  // intra-conference: ~4 games each, inter-conference: ~2 games each
+  for(var i=0;i<n;i++){
+    for(var j=i+1;j<n;j++){
+      var sameConf=teams[i].conf===teams[j].conf;
+      var reps=sameConf?3:2;
+      for(var k=0;k<reps;k++){
+        pairs.push({home:k%2===0?i:j,away:k%2===0?j:i});
+        counts[i]++;counts[j]++;
+      }
+    }
+  }
+  // fill remaining to get closer to 82
+  for(var pass=0;pass<200;pass++){
+    var need=[];
+    for(var i2=0;i2<n;i2++){if(counts[i2]<82)need.push({idx:i2,gap:82-counts[i2]})}
+    need.sort(function(a,b){return b.gap-a.gap});
+    if(need.length<2)break;
+    var paired={};
+    for(var x=0;x<need.length;x++){
+      if(paired[need[x].idx])continue;
+      for(var y=x+1;y<need.length;y++){
+        if(paired[need[y].idx])continue;
+        pairs.push({home:need[x].idx,away:need[y].idx});
+        counts[need[x].idx]++;counts[need[y].idx]++;
+        paired[need[x].idx]=true;paired[need[y].idx]=true;break;
+      }
+    }
+  }
+  // shuffle
+  for(var i3=pairs.length-1;i3>0;i3--){var j3=R(0,i3);var tmp=pairs[i3];pairs[i3]=pairs[j3];pairs[j3]=tmp}
+  var sched=[],assigned=new Array(pairs.length).fill(false),day=1,total=0;
+  while(total<pairs.length){
+    var busy={};
+    for(var i4=0;i4<pairs.length;i4++){
+      if(assigned[i4])continue;
+      var g=pairs[i4];
+      if(busy[g.home]||busy[g.away])continue;
+      busy[g.home]=true;busy[g.away]=true;
+      sched.push({home:g.home,away:g.away,day:day,result:null});
+      assigned[i4]=true;total++;
+    }
+    day++;
+  }
+  return sched;
+}
+
+// Simulation with fixed stats
+function simGame(ht,at,hl){
+  var hp=ht.players.filter(function(p){return!p.injury||p.injury.games<=0});
+  var ap=at.players.filter(function(p){return!p.injury||p.injury.games<=0});
+  if(hp.length<3)hp=ht.players.slice(0,5);if(ap.length<3)ap=at.players.slice(0,5);
+  var hO=hp.reduce(function(s,p){return s+p.ovr},0)/hp.length;
+  var aO=ap.reduce(function(s,p){return s+p.ovr},0)/ap.length;
+  // FIXED: reduced OVR impact from 0.16 to 0.12, increased variance
+  var diff=(hO-aO)*0.12,pace=RF(104,116),hadv=RF(0.5,2.5);
+  var hT=Math.round(clamp(pace+diff+hadv+G(0,9),92,135)),aT=Math.round(clamp(pace-diff-hadv+G(0,9),92,135));
+  function simT(pl,tgt){
+    var st=[],tot=0;
+    pl.forEach(function(p,i){
+      var b=PB[p.pos]||PB.SF;
+      var min=i<5?RF(30,38):i<8?RF(16,26):i<11?RF(6,16):RF(0,6);
+      var ms=min/36,f=RF(0.6,1.4);
+      var pw=Math.pow(p.ovr/78,2.2)*f;
+      // FIXED: star multiplier capped lower for blocks/steals
+      var star=p.ovr>=92?1.8:p.ovr>=87?1.5:p.ovr>=82?1.25:p.ovr>=77?1.1:1.0;
+      var starBlk=Math.min(star,1.5);
+      var starStl=Math.min(star,1.5);
+      var u=(i<5?RF(0.10,0.21):RF(0.04,0.12))*pw;
+      var fga=Math.round(clamp(u*85*ms,0,i<5?32:16));
+      var fgp=clamp(0.34+(p.ovr-60)*0.005+G(0,0.06),0.28,0.62);
+      var fgm=Math.round(fga*fgp);
+      var tpa=Math.round(fga*RF(0.20,0.48));
+      var tpp=clamp(0.27+(p.ovr-60)*0.004+G(0,0.07),0.20,0.48);
+      var tpm=Math.round(tpa*tpp);
+      var fta=Math.round(clamp(fga*RF(0.15,0.40),0,16));
+      var ftp=clamp(0.60+(p.ovr-60)*0.008+G(0,0.08),0.50,0.95);
+      var ftm=Math.round(fta*ftp);
+      var pts=(fgm-tpm)*2+tpm*3+ftm;
+      var rM=(p.pos==="C"||p.pos==="PF")?star:1;
+      var reb=Math.round(clamp(b.reb*ms*RF(0.5,1.5)*rM,0,24));
+      var oreb=Math.round(reb*RF(0.12,0.35));
+      var ast=Math.round(clamp(b.ast*ms*pw*RF(0.5,1.4)*(p.pos==="PG"?star:1),0,22));
+      // FIXED: steals and blocks - reduced ranges and star impact
+      var stl=Math.round(clamp(b.stl*ms*RF(0.3,1.5)*starStl,0,5));
+      var blk=Math.round(clamp(b.blk*ms*RF(0.2,1.6)*starBlk,0,7));
+      tot+=pts;
+      st.push({name:p.name,pos:p.pos,ovr:p.ovr,ht:p.ht,wt:p.wt,min:Math.round(min),pts:pts,reb:reb,oreb:oreb,dreb:reb-oreb,ast:ast,stl:stl,blk:blk,to:Math.round(clamp(RF(0.3,3.5)*ms,0,8)),pf:Math.round(clamp(RF(0.8,4.5)*ms,0,6)),fgm:fgm,fga:fga,tpm:tpm,tpa:tpa,ftm:ftm,fta:fta,ri:i});
+    });
+    if(tot>0&&tot!==tgt){
+      var tO=st.reduce(function(s,p){return s+p.ovr},0),d=tgt-tot;
+      st.forEach(function(p){p.pts+=Math.round(d*(p.ovr/tO))});
+      var rem=tgt-st.reduce(function(s,p){return s+p.pts},0);
+      if(rem)(st.reduce(function(b,p){return p.ovr>b.ovr?p:b},st[0])).pts+=rem;
+      st.forEach(function(p){if(p.pts<0)p.pts=0});
+    }
+    return st;
+  }
+  var hs=simT(hp,hT),as=simT(ap,aT);
+  var hS=hs.reduce(function(s,p){return s+p.pts},0);
+  var aS=as.reduce(function(s,p){return s+p.pts},0);
+  if(hS===aS){hs[R(0,Math.min(4,hs.length-1))].pts+=2;hS+=2}
+  // injuries
+  if(hl){
+    [hp,ap].forEach(function(pl,ti){
+      var tn=ti===0?ht.name:at.name;
+      pl.forEach(function(p){
+        if(Math.random()<0.03){
+          var g2=R(1,15);
+          var ty=pick(["sprained ankle","knee soreness","hamstring strain","back tightness","shoulder injury","groin strain","calf strain"]);
+          p.injury={games:g2,type:ty};
+          hl.push({type:"injury",text:p.name+" ("+tn+") OUT "+g2+" games - "+ty,icon:"\uD83C\uDFE5"});
+        }
+      });
+    });
+    var all2=hs.concat(as);
+    all2.forEach(function(ps){
+      var tn2=hs.indexOf(ps)>=0?ht.name:at.name;
+      if(ps.pts>=40)hl.push({type:"perf",text:ps.name+" ERUPTS for "+ps.pts+" PTS! ("+tn2+")",icon:"\uD83D\uDD25"});
+      else if(ps.pts>=30)hl.push({type:"perf",text:ps.name+" drops "+ps.pts+" PTS ("+tn2+")",icon:"\u2B50"});
+      if(ps.reb>=15)hl.push({type:"perf",text:ps.name+" grabs "+ps.reb+" REB ("+tn2+")",icon:"\uD83D\uDCAA"});
+      if(ps.ast>=12)hl.push({type:"perf",text:ps.name+" dishes "+ps.ast+" AST ("+tn2+")",icon:"\uD83C\uDFAF"});
+      if(ps.blk>=5)hl.push({type:"perf",text:ps.name+" BLOCKS "+ps.blk+" shots ("+tn2+")",icon:"\uD83D\uDEAB"});
+      if(ps.pts>=10&&ps.reb>=10&&ps.ast>=10)hl.push({type:"mile",text:"TRIPLE-DOUBLE: "+ps.name+" "+ps.pts+"/"+ps.reb+"/"+ps.ast,icon:"\uD83D\uDCA5"});
+    });
+    if(Math.abs(hS-aS)<=3)hl.push({type:"game",text:"THRILLER! "+(hS>aS?ht.name:at.name)+" wins "+Math.max(hS,aS)+"-"+Math.min(hS,aS),icon:"\uD83D\uDE31"});
+  }
+  return{homeScore:hS,awayScore:aS,homeStats:hs,awayStats:as};
+}
+
+function accumStats(t,gs){(gs||[]).forEach(function(g){var p=t.players.find(function(x){return x.name===g.name});if(!p)return;var s=p.stats;s.gp++;s.pts+=g.pts;s.reb+=g.reb;s.oreb+=g.oreb;s.dreb+=g.dreb;s.ast+=g.ast;s.stl+=g.stl;s.blk+=g.blk;s.to+=g.to;s.pf+=g.pf;s.fgm+=g.fgm;s.fga+=g.fga;s.tpm+=g.tpm;s.tpa+=g.tpa;s.ftm+=g.ftm;s.fta+=g.fta;s.min+=g.min})}
+function tickInj(teams){(teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){if(p.injury&&p.injury.games>0)p.injury.games--;if(p.injury&&p.injury.games<=0)p.injury=null})})}
+
+// Aging / Draft / Regression
+function ageRetire(teams){
+  var ret=[];
+  (teams||[]).forEach(function(t){
+    var rm=[];
+    var teamWP=t.wins/Math.max(t.wins+t.losses,1);
+    (t.players||[]).forEach(function(p,i){
+      p.prevOvr=p.ovr;p.age++;
+      // Good teams regression: top players on winning teams decline faster
+      var regressionPenalty=0;
+      if(teamWP>0.6&&p.ovr>=85)regressionPenalty=R(0,2);
+      if(p.age<=25)p.ovr=Math.min(99,p.ovr+R(0,3)-regressionPenalty);
+      else if(p.age<=30)p.ovr=clamp(p.ovr+R(-2,1)-regressionPenalty,50,99);
+      else if(p.age<=33)p.ovr=Math.max(50,p.ovr+R(-3,0));
+      else p.ovr=Math.max(45,p.ovr+R(-5,-1));
+      if(!p.ovrHistory)p.ovrHistory=[];
+      p.ovrHistory.push(p.ovr);
+      p.contractYrs=Math.max(0,(p.contractYrs||1)-1);
+      var ch=0;
+      if(p.age>=38)ch=1;else if(p.age>=37)ch=0.9;else if(p.age>=36)ch=0.75;else if(p.age>=35)ch=0.55;else if(p.age>=34)ch=0.35;
+      if(Math.random()<ch){rm.push(i);ret.push({name:p.name,pos:p.pos,age:p.age,ovr:p.ovr,ht:p.ht,wt:p.wt,team:t.name,teamColor:t.color,peakOvr:Math.max.apply(null,p.ovrHistory||[p.ovr])})}
+    });
+    rm.sort(function(a,b){return b-a}).forEach(function(i){t.players.splice(i,1)});
+  });
+  return ret;
+}
+
+function runDraft(teams,nr){
+  var np=(teams||[]).length,nP=Math.max(np,nr)+6,used=new Set();
+  (teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){used.add(p.name)})});
+  var pros=[];
+  for(var i=0;i<nP;i++){
+    var pos=pick(["PG","SG","SF","PF","C"]),age=R(19,22);
+    var pct2=1-(i/nP),ovr=clamp(Math.round(62+pct2*26+G(0,4)),58,92);
+    var nm=genName(used);used.add(nm);
+    pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:ovr>=85?"Franchise talent":ovr>=78?"Solid starter":"Role player",draftRank:i+1});
+  }
+  pros.sort(function(a,b){return b.ovr-a.ovr});
+  pros.forEach(function(p,i){p.draftRank=i+1});
+  var sorted=(teams||[]).slice().sort(function(a,b){return(a.wins/Math.max(a.wins+a.losses,1))-(b.wins/Math.max(b.wins+b.losses,1))});
+  var wts=sorted.map(function(_,i){return sorted.length-i+R(0,3)});
+  var order=[],ui=new Set();
+  while(order.length<sorted.length){
+    var tt=0;for(var i2=0;i2<wts.length;i2++)if(!ui.has(i2))tt+=wts[i2];
+    var r2=Math.random()*tt;
+    for(var i3=0;i3<sorted.length;i3++){
+      if(ui.has(i3))continue;r2-=wts[i3];
+      if(r2<=0){order.push(sorted[i3]);ui.add(i3);break}
+    }
+    if(ui.size<order.length+1){for(var i4=0;i4<sorted.length;i4++){if(!ui.has(i4)){order.push(sorted[i4]);ui.add(i4)}}}
+  }
+  var picks=[],avail=pros.slice();
+  order.forEach(function(tm,pi){
+    if(!avail.length)return;
+    var ch=avail.shift();
+    tm.players.push(makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info));
+    tm.players.sort(function(a,b){return b.ovr-a.ovr});
+    picks.push({pick:pi+1,team:tm.name,teamColor:COLORS2[tm.name]||"#666",player:ch});
+  });
+  return{picks:picks,undrafted:avail};
+}
+
+// Playoffs: Conference-based, 4 rounds
+function initPO(teams){
+  var east=(teams||[]).filter(function(t){return t.conf==="EAST"}).sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins}).slice(0,8);
+  var west=(teams||[]).filter(function(t){return t.conf==="WEST"}).sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins}).slice(0,8);
+  function makeBracket(s){
+    return[
+      {hN:s[0].name,lN:s[7].name,hW:0,lW:0,g:[]},
+      {hN:s[1].name,lN:s[6].name,hW:0,lW:0,g:[]},
+      {hN:s[2].name,lN:s[5].name,hW:0,lW:0,g:[]},
+      {hN:s[3].name,lN:s[4].name,hW:0,lW:0,g:[]}
+    ];
+  }
+  return{
+    round:"quarters",
+    eastBracket:{quarters:makeBracket(east),semis:null,confFinals:null},
+    westBracket:{quarters:makeBracket(west),semis:null,confFinals:null},
+    finals:null,
+    champ:null,
+    eastSeeds:east.map(function(t){return{name:t.name,color:COLORS2[t.name]}}),
+    westSeeds:west.map(function(t){return{name:t.name,color:COLORS2[t.name]}})
+  };
+}
+
+function simPOGame(st,conf,round,muIdx){
+  var po=st.playoffs;if(!po)return;
+  var mu;
+  if(round==="finals"){
+    mu=po.finals;
+  } else {
+    var bracket=conf==="EAST"?po.eastBracket:po.westBracket;
+    if(round==="quarters")mu=(bracket.quarters||[])[muIdx];
+    else if(round==="semis")mu=(bracket.semis||[])[muIdx];
+    else if(round==="confFinals")mu=bracket.confFinals;
+  }
+  if(!mu)return;
+  var hT2=st.teams.find(function(t){return t.name===mu.hN});
+  var aT2=st.teams.find(function(t){return t.name===mu.lN});
+  if(!hT2||!aT2)return;
+  var gArr=(mu.g||[]);
+  var home=gArr.length%2===0?hT2:aT2;
+  var away=home===hT2?aT2:hT2;
+  if(!st.headlines)st.headlines=[];
+  var r2=simGame(home,away,st.headlines);
+  if(!mu.g)mu.g=[];
+  mu.g.push(r2);
+  var hWon=(home===hT2&&r2.homeScore>r2.awayScore)||(away===hT2&&r2.awayScore>r2.homeScore);
+  if(hWon)mu.hW++;else mu.lW++;
+  accumStats(home,r2.homeStats);accumStats(away,r2.awayStats);tickInj(st.teams);
+
+  if(mu.hW>=4||mu.lW>=4){
+    var winner=mu.hW>=4?mu.hN:mu.lN;
+    st.headlines.push({type:"po",text:winner+" wins the "+round+" series!",icon:"\uD83C\uDFC0"});
+
+    if(round==="finals"){
+      po.champ={name:winner,color:COLORS2[winner]};po.round="done";
+      st.headlines.push({type:"po",text:winner+" are the MDBA CHAMPIONS!",icon:"\uD83C\uDFC6"});
+    } else {
+      // Advance within conference bracket
+      var brk=conf==="EAST"?po.eastBracket:po.westBracket;
+      if(round==="quarters"){
+        if((brk.quarters||[]).every(function(m){return m.hW>=4||m.lW>=4})){
+          var w=(brk.quarters||[]).map(function(m){return m.hW>=4?m.hN:m.lN});
+          brk.semis=[{hN:w[0],lN:w[3],hW:0,lW:0,g:[]},{hN:w[1],lN:w[2],hW:0,lW:0,g:[]}];
+          // check if other conf also done quarters
+          var otherBrk=conf==="EAST"?po.westBracket:po.eastBracket;
+          if((otherBrk.quarters||[]).every(function(m){return m.hW>=4||m.lW>=4})&&otherBrk.semis){
+            po.round="semis";
+          } else if((otherBrk.quarters||[]).every(function(m){return m.hW>=4||m.lW>=4})){
+            po.round="semis";
+          }
+          st.headlines.push({type:"po",text:conf+" Conference Semis set!",icon:"\uD83D\uDD25"});
+        }
+      } else if(round==="semis"){
+        if((brk.semis||[]).every(function(m){return m.hW>=4||m.lW>=4})){
+          var w2=(brk.semis||[]).map(function(m){return m.hW>=4?m.hN:m.lN});
+          brk.confFinals={hN:w2[0],lN:w2[1],hW:0,lW:0,g:[]};
+          st.headlines.push({type:"po",text:conf+" Conference Finals: "+w2[0]+" vs "+w2[1],icon:"\uD83D\uDD25"});
+        }
+      } else if(round==="confFinals"){
+        // check if both conf finals done
+        var eBrk=po.eastBracket,wBrk=po.westBracket;
+        if(eBrk.confFinals&&wBrk.confFinals){
+          var eDone=eBrk.confFinals.hW>=4||eBrk.confFinals.lW>=4;
+          var wDone=wBrk.confFinals.hW>=4||wBrk.confFinals.lW>=4;
+          if(eDone&&wDone){
+            var eWin=eBrk.confFinals.hW>=4?eBrk.confFinals.hN:eBrk.confFinals.lN;
+            var wWin=wBrk.confFinals.hW>=4?wBrk.confFinals.hN:wBrk.confFinals.lN;
+            po.finals={hN:eWin,lN:wWin,hW:0,lW:0,g:[]};
+            po.round="finals";
+            st.headlines.push({type:"po",text:"MDBA FINALS: "+eWin+" vs "+wWin,icon:"\uD83D\uDD25"});
+          }
+        }
+      }
+    }
+  }
+}
+
+// All-Star
+function runAllStar(st){
+  var all=[];(st.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){if(p.stats.gp>=5){var gp=p.stats.gp;all.push({name:p.name,pos:p.pos,ovr:p.ovr,team:t.name,color:COLORS2[t.name],score:p.ovr*2+p.stats.pts/gp+p.stats.ast/gp*0.5,ht:p.ht,ppg:p.stats.pts/gp,conf:t.conf})}})});
+  all.sort(function(a,b){return b.score-a.score});
+  var starters=all.slice(0,10);
+  var teamA=starters.filter(function(_,i){return i%2===0});
+  var teamB=starters.filter(function(_,i){return i%2!==0});
+  var aScore=R(140,175),bScore=R(140,175);while(aScore===bScore)bScore++;
+  var shooters=all.filter(function(p){return p.pos==="SG"||p.pos==="PG"}).slice(0,6);
+  var tpc=shooters.map(function(p){var made=0;for(var i=0;i<25;i++)if(Math.random()<0.35+(p.ovr-75)*0.005)made++;return{name:p.name,team:p.team,color:p.color,made:made}}).sort(function(a,b){return b.made-a.made});
+  var dunkers=all.filter(function(p){return p.pos==="SF"||p.pos==="PF"||p.ovr>=85}).slice(0,4);
+  var dc=dunkers.map(function(p){var s1=R(35,50),s2=R(35,50);return{name:p.name,team:p.team,color:p.color,r1:s1,r2:s2,total:s1+s2}}).sort(function(a,b){return b.total-a.total});
+  return{teamA:teamA,teamB:teamB,aScore:aScore,bScore:bScore,tpc:tpc,dunk:dc,mvp:all.length>0?all[R(0,Math.min(4,all.length-1))]:null};
+}
+
+// Awards
+function getAwards(st){
+  var all=[];
+  (st.teams||[]).forEach(function(t){
+    var wp=t.wins/Math.max(t.wins+t.losses,1);
+    (t.players||[]).forEach(function(p,i){
+      if(p.stats.gp>=1)all.push({name:p.name,pos:p.pos,ovr:p.ovr,age:p.age,ht:p.ht,wt:p.wt,stats:p.stats,teamName:t.name,teamColor:COLORS2[t.name],ri:i,wp:wp,salary:p.salary});
+    });
+  });
+  function sc(l,fn){return l.map(function(p){return Object.assign({},p,{score:fn(p)})}).sort(function(a,b){return b.score-a.score}).slice(0,5)}
+  var g5=all.filter(function(p){return p.stats.gp>=5});
+  return{
+    mvp:sc(g5,function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.7+(p.stats.ast/g)*.85+(p.stats.stl/g)*1.2+p.stats.blk/g+p.wp*18}),
+    dpoy:sc(g5,function(p){var g=p.stats.gp;return(p.stats.stl/g)*2+(p.stats.blk/g)*2.5+(p.stats.reb/g)*.4}),
+    smoy:sc(all.filter(function(p){return p.ri>=5&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.5+(p.stats.ast/g)*.7}),
+    mip:sc(all.filter(function(p){return p.ovr<=80&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g-p.ovr*.2}),
+    roy:sc(all.filter(function(p){return p.age<=22&&p.stats.gp>=5}),function(p){var g=p.stats.gp;return p.stats.pts/g+(p.stats.reb/g)*.5+(p.stats.ast/g)*.5})
+  };
+}
+
+// Firebase array fix - comprehensive
+function fixArrays(v){
+  try{
+    if(v===null||v===undefined)return;
+    function fixArr(obj,key){
+      if(obj&&obj[key]===null)obj[key]=[];
+      if(obj&&obj[key]&&!Array.isArray(obj[key]))obj[key]=Object.values(obj[key]);
+    }
+    fixArr(v,"teams");fixArr(v,"schedule");fixArr(v,"history");fixArr(v,"freeAgents");
+    fixArr(v,"allRetired");fixArr(v,"headlines");fixArr(v,"allTimeAwards");fixArr(v,"allTimeStatLeaders");fixArr(v,"hallOfFame");
+    if(v.teams)(v.teams||[]).forEach(function(t){
+      fixArr(t,"players");
+      if(t.players)(t.players||[]).forEach(function(p){
+        fixArr(p,"strengths");fixArr(p,"ovrHistory");
+      });
+    });
+    if(v.schedule)(v.schedule||[]).forEach(function(g){
+      if(g&&g.result){
+        fixArr(g.result,"homeStats");fixArr(g.result,"awayStats");
+      }
+    });
+    if(v.playoffs){
+      var po=v.playoffs;
+      // east bracket
+      if(po.eastBracket){
+        fixArr(po.eastBracket,"quarters");
+        fixArr(po.eastBracket,"semis");
+        if(po.eastBracket.quarters)(po.eastBracket.quarters||[]).forEach(function(m){if(m){fixArr(m,"g");if(!m.g)m.g=[]}});
+        if(po.eastBracket.semis)(po.eastBracket.semis||[]).forEach(function(m){if(m){fixArr(m,"g");if(!m.g)m.g=[]}});
+        if(po.eastBracket.confFinals){fixArr(po.eastBracket.confFinals,"g");if(!po.eastBracket.confFinals.g)po.eastBracket.confFinals.g=[]}
+      }
+      // west bracket
+      if(po.westBracket){
+        fixArr(po.westBracket,"quarters");
+        fixArr(po.westBracket,"semis");
+        if(po.westBracket.quarters)(po.westBracket.quarters||[]).forEach(function(m){if(m){fixArr(m,"g");if(!m.g)m.g=[]}});
+        if(po.westBracket.semis)(po.westBracket.semis||[]).forEach(function(m){if(m){fixArr(m,"g");if(!m.g)m.g=[]}});
+        if(po.westBracket.confFinals){fixArr(po.westBracket.confFinals,"g");if(!po.westBracket.confFinals.g)po.westBracket.confFinals.g=[]}
+      }
+      if(po.finals){fixArr(po.finals,"g");if(!po.finals.g)po.finals.g=[]}
+      fixArr(po,"eastSeeds");fixArr(po,"westSeeds");
+    }
+    if(v.lastDraft){
+      fixArr(v.lastDraft,"picks");fixArr(v.lastDraft,"undrafted");
+    }
+    fixArr(v,"lastRetired");
+    if(v.allStar){
+      fixArr(v.allStar,"teamA");fixArr(v.allStar,"teamB");
+      fixArr(v.allStar,"tpc");fixArr(v.allStar,"dunk");
+    }
+  }catch(e){/* fail silently */}
+}
+
+// React App
+function App(){
+  var _=React.useState;
+  var _s=_(null),state=_s[0],setState=_s[1];
+  var _v=_("teams"),view=_v[0],setView=_v[1];
+  var _sv=_(null),sub=_sv[0],setSub=_sv[1];
+  var _sp=_(0),sPage=_sp[0],setSPage=_sp[1];
+  var _lc=_("pts"),lCat=_lc[0],setLCat=_lc[1];
+  var _conn=_(false),conn=_conn[0],setConn=_conn[1];
+  var _modal=_(null),modal=_modal[0],setModal=_modal[1];
+  var _stab=_("EAST"),sTab=_stab[0],setSTab=_stab[1];
+  var lwid=React.useRef(null);
+
+  React.useEffect(function(){
+    db.ref(".info/connected").on("value",function(s2){setConn(!!s2.val())});
+    gameRef.on("value",function(snap){
+      var v=snap.val();
+      if(!v||v.version!==VERSION){gameRef.set(buildInit());return}
+      if(v._wid&&v._wid===lwid.current){lwid.current=null;return}
+      fixArrays(v);setState(v);
+    });
+  },[]);
+
+  function buildInit(){
+    var t=initTeams(),s=genSchedule(t);
+    return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:1,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:[],playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{}};
+  }
+  function sync(s2){var w2="w"+Date.now()+Math.random();lwid.current=w2;s2._wid=w2;s2.version=VERSION;setState(s2);gameRef.set(s2)}
+
+  function processGame(n,gi){
+    var g=(n.schedule||[])[gi];if(!g||g.result)return;
+    var ht=(n.teams||[])[g.home],at=(n.teams||[])[g.away];
+    if(!ht||!at)return;
+    if(!n.headlines)n.headlines=[];
+    g.result=simGame(ht,at,n.headlines);
+    if(g.result.homeScore>g.result.awayScore){ht.wins++;at.losses++}else{at.wins++;ht.losses++}
+    accumStats(ht,g.result.homeStats);accumStats(at,g.result.awayStats);tickInj(n.teams);
+  }
+  function checkEnd(n){
+    if((n.schedule||[]).every(function(g){return g.result})){
+      n.done=true;n.phase="playoffs";n.playoffs=initPO(n.teams);
+      if(!n.allStar)n.allStar=runAllStar(n);
+      n.headlines.push({type:"po",text:"PLAYOFFS BEGIN! Top 8 from each conference!",icon:"\uD83C\uDFC6"});
+    }
+  }
+  function simIdx(gi){var n=DC(state);processGame(n,gi);checkEnd(n);sync(n)}
+  function simDay(){
+    var n=DC(state);
+    (n.schedule||[]).filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,(n.schedule||[]).indexOf(g))});
+    var ad=!(n.schedule||[]).some(function(g){return g.day===n.currentDay&&!g.result});
+    if(ad){var mx=Math.max.apply(null,(n.schedule||[]).map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++}
+    checkEnd(n);sync(n);
+  }
+  function advDay(){var n=DC(state);var mx=Math.max.apply(null,(n.schedule||[]).map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++;sync(n)}
+  function simWeek(){
+    var n=DC(state);
+    for(var d=0;d<7;d++){
+      (n.schedule||[]).filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,(n.schedule||[]).indexOf(g))});
+      var ad=!(n.schedule||[]).some(function(g){return g.day===n.currentDay&&!g.result});
+      if(ad){var mx=Math.max.apply(null,(n.schedule||[]).map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++;else break}
+    }
+    checkEnd(n);sync(n);
+  }
+  function simAll(){
+    var n=DC(state);
+    (n.schedule||[]).forEach(function(g,i){if(!g.result)processGame(n,i)});
+    n.done=true;n.currentDay=Math.max.apply(null,(n.schedule||[{day:1}]).map(function(g){return g.day}));
+    n.phase="playoffs";n.playoffs=initPO(n.teams);n.allStar=runAllStar(n);
+    n.headlines.push({type:"po",text:"PLAYOFFS!",icon:"\uD83C\uDFC6"});sync(n);
+  }
+  function simPO(conf,round,muIdx){
+    var n=DC(state);simPOGame(n,conf,round,muIdx);
+    if(n.playoffs&&n.playoffs.champ){n.phase="offseason";archSeason(n)}
+    sync(n);
+  }
+
+  function archSeason(st){
+    var sorted=(st.teams||[]).slice().sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins});
+    var aw=getAwards(st);
+    var ch=st.playoffs&&st.playoffs.champ?st.playoffs.champ:{name:sorted[0].name,color:sorted[0].color};
+    var mv=(aw.mvp||[])[0];
+    if(!st.history)st.history=[];
+    st.history.push({id:Date.now(),date:new Date().toLocaleDateString(),sn:st.seasonNum,champ:ch.name,champColor:ch.color,mvp:mv?mv.name:"N/A",dpoy:((aw.dpoy||[])[0]||{}).name||"N/A",roy:((aw.roy||[])[0]||{}).name||"N/A",standings:sorted.slice(0,8).map(function(t){return{name:t.name,w:t.wins,l:t.losses}})});
+    // All-time championship tracking
+    if(!st.champCounts)st.champCounts={};
+    if(!st.champCounts[ch.name])st.champCounts[ch.name]=0;
+    st.champCounts[ch.name]++;
+    // Track on team object too
+    (st.teams||[]).forEach(function(t){if(t.name===ch.name)t.championships=(t.championships||0)+1});
+    // All-time awards
+    if(!st.allTimeAwards)st.allTimeAwards=[];
+    st.allTimeAwards.push({season:st.seasonNum,mvp:mv?mv.name:"N/A",dpoy:((aw.dpoy||[])[0]||{}).name||"N/A",smoy:((aw.smoy||[])[0]||{}).name||"N/A",roy:((aw.roy||[])[0]||{}).name||"N/A",champ:ch.name});
+    // Hall of Fame: retired players with peak OVR >= 85
+    // (handled in nextSeason when we get retired list)
+  }
+
+  function nextSeason(){
+    var n=DC(state);
+    var ret=ageRetire(n.teams);
+    // Add to hall of fame
+    if(!n.hallOfFame)n.hallOfFame=[];
+    ret.forEach(function(p){
+      var peak=p.peakOvr||p.ovr;
+      if(peak>=85){
+        n.hallOfFame.push({name:p.name,pos:p.pos,team:p.team,peakOvr:peak,retiredAge:p.age,inductedSeason:n.seasonNum});
+      }
+    });
+    var draft=runDraft(n.teams,ret.length);
+    var fa=(draft.undrafted||[]).map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
+    // Free agent signing / luxury tax logic
+    (n.teams||[]).forEach(function(t){
+      t.wins=0;t.losses=0;
+      var totalPayroll=(t.players||[]).reduce(function(s,p){return s+(p.salary||0)},0);
+      var luxuryLine=170000000;
+      (t.players||[]).forEach(function(p){
+        p.stats=emptyStats();p.injury=null;
+        if(p.contractYrs<=0){
+          p.salary=genSalary(p.ovr,p.age);
+          p.contractYrs=R(1,4);
+          // luxury tax: teams over luxury line can only sign cheap deals
+          if(totalPayroll>luxuryLine){
+            p.salary=Math.round(p.salary*0.6);
+            p.contractYrs=Math.min(p.contractYrs,2);
+          }
+        }
+      });
+      t.capSpace=140000000-(t.players||[]).reduce(function(s,p){return s+p.salary},0);
+    });
+    n.schedule=genSchedule(n.teams);n.currentDay=1;n.done=false;
+    n.seasonNum=(n.seasonNum||1)+1;n.lastDraft=draft;n.lastRetired=ret;n.freeAgents=fa;
+    n.playoffs=null;n.allStar=null;n.phase="season";n.headlines=[];
+    if(!n.allRetired)n.allRetired=[];
+    n.allRetired=(n.allRetired||[]).concat(ret);
+    sync(n);setView("draft");setSub(null);
+  }
+
+  function resetAll(){if(!confirm("Reset EVERYTHING? Returns to original rosters."))return;sync(buildInit());setView("teams");setSub(null)}
+  function deleteHistory(){if(!confirm("Delete all season history and reset?"))return;sync(buildInit());setView("teams");setSub(null)}
+
+  if(!state)return h("div",{style:{maxWidth:960,margin:"80px auto",textAlign:"center"}},h("div",{style:{fontSize:56}},"\uD83C\uDFC0"),h("h1",{style:{color:PRIMARY,marginBottom:8}},"MDBA v8"),h("p",{style:{color:"#8b949e",animation:"pulse 1.5s infinite"}},"Connecting..."));
+
+  // Helpers
+  function dot(c){return h("span",{style:{display:"inline-block",width:10,height:10,borderRadius:"50%",background:c,marginRight:6}})}
+  function oB(o){return h("span",{style:{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:11,fontWeight:700,color:"#fff",background:o>=88?PRIMARY:o>=80?"#e07050":o>=72?"#d4a843":"#666",minWidth:28,textAlign:"center"}},o)}
+  function tHead(c){return h("thead",null,h("tr",null,c.map(function(x){return h("th",{key:x},x)})))}
+  function medal(i){return i===0?"\uD83E\uDD47":i===1?"\uD83E\uDD48":"\uD83E\uDD49"}
+  function avatar(n,c,s){var sz=s||36;var ini=(n||"").split(" ").map(function(w){return w[0]}).join("").slice(0,2);return h("div",{style:{width:sz,height:sz,borderRadius:"50%",background:"linear-gradient(135deg,"+(c||"#666")+","+(c||"#666")+"88)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:sz*0.36,flexShrink:0,border:"2px solid rgba(255,255,255,0.3)",boxShadow:"0 2px 6px rgba(0,0,0,0.3)"}},ini)}
+  function pLink(n){return h("span",{className:"plink",onClick:function(e){e.stopPropagation();openPC(n)}},n)}
+  function openPC(n){var f=null,t2=null;(state.teams||[]).forEach(function(tm){(tm.players||[]).forEach(function(p){if(p.name===n){f=p;t2=tm}})});if(f)setModal({type:"player",p:f,t:t2})}
+  function injTag(p){return p.injury&&p.injury.games>0?h("span",{className:"inj"},p.injury.type.toUpperCase()+" ("+p.injury.games+"G)"):null}
+  function teamEmoji(name){var m=TEAM_META[name];return m?m.emoji:"\uD83C\uDFC0"}
+  function confBadge(conf){return h("span",{className:"conf-badge",style:{background:conf==="EAST"?"#1f6feb":"#da3633",color:"#fff"}},conf)}
+  function dynastyBadge(name){var cnt=(state.champCounts||{})[name]||0;if(cnt>=3)return h("span",{className:"dynasty-badge"},"DYNASTY "+cnt+"x");return null}
+
+  // Get top 5 OVR for signature shoe
+  function getTop5OVR(){
+    var all=[];
+    (state.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){all.push(p)})});
+    all.sort(function(a,b){return b.ovr-a.ovr});
+    var top5names={};
+    for(var i=0;i<Math.min(5,all.length);i++){top5names[all[i].name]=true}
+    return top5names;
+  }
+
+  var todayG=(state.schedule||[]).filter(function(g){return g.day===state.currentDay});
+  var allDayDone=todayG.every(function(g){return g.result});
+
+  // Modal
+  function renderModal(){
+    if(!modal)return null;
+    var p=modal.p,t2=modal.t;if(!p)return null;
+    var gp=p.stats.gp,ch=p.prevOvr?p.ovr-p.prevOvr:0;
+    var top5=getTop5OVR();
+    var hasSigShoe=!!top5[p.name];
+    return h("div",{className:"modal-overlay",onClick:function(){setModal(null)}},
+      h("div",{className:"modal fade-in",onClick:function(e){e.stopPropagation()}},
+        h("button",{style:{position:"absolute",top:12,right:16,background:"none",border:"none",fontSize:20,color:"#8b949e",cursor:"pointer"},onClick:function(){setModal(null)}},"\u2715"),
+        h("div",{style:{display:"flex",gap:16,alignItems:"center",marginBottom:16}},
+          avatar(p.name,t2?t2.color:"#666",80),
+          h("div",null,
+            h("div",{style:{fontSize:22,fontWeight:800,color:"#e6edf3"}},p.name),
+            h("div",{style:{fontSize:13,color:"#8b949e",marginTop:2}},t2?teamEmoji(t2.name)+" "+t2.name:"Free Agent"),
+            h("div",{style:{fontSize:12,color:"#6e7681"}},p.pos+" | "+htStr(p.ht)+" | "+p.wt+" lbs | Age "+p.age)
+          )
+        ),
+        h("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}},
+          h("div",{style:{padding:12,background:"#1c2128",borderRadius:10,textAlign:"center",minWidth:70,border:"1px solid #30363d"}},h("div",{style:{fontSize:10,color:"#8b949e"}},"OVR"),oB(p.ovr),ch?h("div",{style:{fontSize:11,color:ch>0?"#3fb950":"#f85149",fontWeight:600}},ch>0?"+"+ch:ch):null),
+          h("div",{style:{padding:12,background:"#1c2128",borderRadius:10,textAlign:"center",minWidth:70,border:"1px solid #30363d"}},h("div",{style:{fontSize:10,color:"#8b949e"}},"SALARY"),h("div",{style:{fontSize:14,fontWeight:700,color:"#3fb950"}},salStr(p.salary||0))),
+          h("div",{style:{padding:12,background:"#1c2128",borderRadius:10,textAlign:"center",minWidth:70,border:"1px solid #30363d"}},h("div",{style:{fontSize:10,color:"#8b949e"}},"CONTRACT"),h("div",{style:{fontSize:14,fontWeight:700,color:"#e6edf3"}},(p.contractYrs||0)+" yr"+(p.contractYrs!==1?"s":"")))
+        ),
+        // Bio with car and shoe
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16,fontSize:12}},
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83C\uDF0D Birthplace: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.birthplace||"Unknown")),
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83C\uDF93 College: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.college||"N/A")),
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83D\uDC5F Shoes: "),h("span",{style:{fontWeight:600,color:hasSigShoe?"#FFD700":"#e6edf3"}},p.shoeBrand||"Nike",hasSigShoe?" (Signature)":"")),
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83D\uDE97 Car: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.car||"N/A")),
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83D\uDC5F Sponsor: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.sponsor||"None")),
+          h("div",null,h("span",{style:{color:"#8b949e"}},"\uD83C\uDF55 Fav Food: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.favFood||"N/A")),
+          h("div",{style:{gridColumn:"1/3"}},h("span",{style:{color:"#8b949e"}},"\u2728 Fun Fact: "),h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.funFact||""))
+        ),
+        // Strengths
+        h("div",{style:{marginBottom:12}},
+          h("div",{style:{fontSize:11,color:"#8b949e",marginBottom:4}},"STRENGTHS"),
+          h("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},(p.strengths||[]).map(function(s2,i){return h("span",{key:i,className:"str-pill"},s2)})),
+          p.weakness?h("div",{style:{marginTop:6}},h("span",{style:{background:"#3d1f20",color:"#f85149",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}},"\u26A0 "+p.weakness)):null
+        ),
+        p.info?h("div",{style:{padding:10,background:"#1c2128",borderRadius:8,fontSize:12,fontStyle:"italic",marginBottom:12,color:"#8b949e",border:"1px solid #30363d"}},'"'+p.info+'"'):null,
+        p.injury&&p.injury.games>0?h("div",{style:{padding:10,background:"#3d1f20",borderRadius:8,marginBottom:12,fontSize:12,color:"#f85149"}},"\uD83C\uDFE5 "+p.injury.type+" ("+p.injury.games+" games)"):null,
+        gp>0?h("div",null,h("div",{style:{fontSize:11,color:"#8b949e",marginBottom:6}},"SEASON AVERAGES ("+gp+" GP)"),h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}},[{l:"PPG",v:avg(p.stats.pts,gp)},{l:"RPG",v:avg(p.stats.reb,gp)},{l:"APG",v:avg(p.stats.ast,gp)},{l:"SPG",v:avg(p.stats.stl,gp)},{l:"BPG",v:avg(p.stats.blk,gp)},{l:"FG%",v:pct(p.stats.fgm,p.stats.fga)},{l:"3P%",v:pct(p.stats.tpm,p.stats.tpa)},{l:"MPG",v:avg(p.stats.min,gp)}].map(function(s2){return h("div",{key:s2.l,style:{textAlign:"center",padding:8,background:"#1c2128",borderRadius:8,border:"1px solid #30363d"}},h("div",{style:{fontSize:16,fontWeight:700,color:"#e6edf3"}},s2.v),h("div",{style:{fontSize:9,color:"#8b949e"}},s2.l))}))):null
+      )
+    );
+  }
+
+  // Teams page
+  function vTeams(){
+    var eastTeams=(state.teams||[]).filter(function(t){return t.conf==="EAST"});
+    var westTeams=(state.teams||[]).filter(function(t){return t.conf==="WEST"});
+    function teamGrid(tms,confName){
+      return h("div",null,
+        h("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:12,marginTop:16}},
+          h("span",{style:{fontSize:16,fontWeight:800,color:confName==="EAST"?"#1f6feb":"#da3633"}},confName==="EAST"?"\uD83C\uDF1F EASTERN CONFERENCE":"\uD83C\uDF1F WESTERN CONFERENCE")),
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}},
+          tms.map(function(t){
+            var meta=TEAM_META[t.name]||{};
+            var avgO=Math.round((t.players||[]).reduce(function(s,p){return s+p.ovr},0)/Math.max((t.players||[]).length,1));
+            var totalSal=(t.players||[]).reduce(function(s,p){return s+(p.salary||0)},0);
+            return h("div",{key:t.name,className:"team-card fade-in",onClick:function(){setSub({t:"team",d:t.name})}},
+              h("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:10}},
+                h("div",{style:{width:50,height:50,borderRadius:12,background:"linear-gradient(135deg,"+(t.color||"#666")+","+(t.color||"#666")+"88)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}},meta.emoji||"\uD83C\uDFC0"),
+                h("div",null,
+                  h("div",{style:{fontWeight:800,fontSize:15,color:"#e6edf3"}},t.name,dynastyBadge(t.name)),
+                  h("div",{style:{fontSize:11,color:"#8b949e"}},(meta.city||"")+" | "+(meta.arena||""))
+                )
+              ),
+              h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:12,alignItems:"center"}},
+                h("span",null,h("span",{style:{fontWeight:700,fontSize:16,color:"#e6edf3"}},t.wins+"-"+t.losses)),
+                h("span",null,"OVR: ",oB(avgO)),
+                h("span",{className:"salary"},salStr(totalSal))
+              )
+            );
+          })
+        )
+      );
+    }
+    return h("div",null,
+      h("h2",{style:{marginBottom:8,color:ACCENT,fontSize:20}},"\uD83C\uDFC0 MDBA Teams (30)"),
+      teamGrid(eastTeams,"EAST"),
+      teamGrid(westTeams,"WEST")
+    );
+  }
+
+  // Team detail
+  function vTeam(name){
+    var t=(state.teams||[]).find(function(x){return x.name===name});if(!t)return h("div",null,"Not found");
+    var meta=TEAM_META[name]||{};
+    var totalSal=(t.players||[]).reduce(function(s,p){return s+(p.salary||0)},0);
+    var cap=140000000,lux=170000000;
+    var chCount=(state.champCounts||{})[name]||0;
+    return h("div",null,
+      h("button",{className:"pill",style:{background:PRIMARY,color:"#fff",marginBottom:12},onClick:function(){setSub(null)}},"\u2190 Back"),
+      h("div",{style:{background:"linear-gradient(135deg,"+(t.color||"#666")+","+(t.color||"#666")+"66)",color:"#fff",borderRadius:12,padding:24,marginBottom:16,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap",border:"1px solid #30363d"}},
+        h("div",{style:{fontSize:48}},meta.emoji||"\uD83C\uDFC0"),
+        h("div",null,
+          h("h2",{style:{fontSize:24,fontWeight:800}},t.name,dynastyBadge(name)),
+          h("div",{style:{opacity:0.8,fontSize:13}},meta.motto||""),
+          h("div",{style:{fontSize:14,marginTop:4}},t.wins+"-"+t.losses," | ",confBadge(t.conf||getConf(name)),chCount>0?h("span",{style:{marginLeft:8}},"\uD83C\uDFC6 x"+chCount):null)
+        ),
+        h("div",{style:{marginLeft:"auto",textAlign:"right",fontSize:12,opacity:0.85}},
+          h("div",null,"\uD83C\uDFDF "+(meta.arena||"")),
+          h("div",null,"\uD83D\uDC64 "+(meta.owner||"")),
+          h("div",null,"Est. "+(meta.est||""))
+        )
+      ),
+      h("div",{className:"card",style:{marginBottom:12}},
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+          h("h3",{style:{fontSize:14,color:"#e6edf3"}},"Payroll"),
+          h("div",{style:{fontSize:12}},
+            h("span",{style:{fontWeight:700,color:totalSal>lux?"#f85149":totalSal>cap?"#d29922":"#3fb950"}},salStr(totalSal))," / ",salStr(cap),
+            totalSal>lux?" \uD83D\uDEA8 LUXURY TAX":""
+          )
+        ),
+        h("div",{style:{height:8,background:"#21262d",borderRadius:4,overflow:"hidden"}},h("div",{style:{height:"100%",width:Math.min(100,totalSal/cap*100)+"%",background:totalSal>cap?"#f85149":"#3fb950",borderRadius:4}}))
+      ),
+      h("div",{className:"card"},h("div",{style:{overflowX:"auto"}},h("table",null,
+        tHead(["","PLAYER","POS","OVR","AGE","HT","WT","SALARY","YRS","PPG","RPG","APG","FG%"]),
+        h("tbody",null,(t.players||[]).map(function(p,i){var gp=p.stats.gp;
+          return h("tr",{key:p.name,style:{background:i%2===0?"#0d1117":"#161b22",borderTop:i===5?"3px solid "+PRIMARY:"none"}},
+            h("td",{style:{padding:"6px"}},avatar(p.name,t.color,28)),
+            h("td",{style:{padding:"6px"}},pLink(p.name),injTag(p)),
+            h("td",{style:{padding:"6px",color:"#8b949e"}},p.pos),h("td",{style:{padding:"6px"}},oB(p.ovr)),
+            h("td",{style:{padding:"6px",color:"#8b949e"}},p.age),h("td",{style:{padding:"6px",fontSize:11,color:"#8b949e"}},htStr(p.ht)),h("td",{style:{padding:"6px",fontSize:11,color:"#8b949e"}},p.wt),
+            h("td",{style:{padding:"6px"},className:"salary"},salStr(p.salary||0)),
+            h("td",{style:{padding:"6px",fontSize:11,color:"#8b949e"}},p.contractYrs||0),
+            h("td",{style:{padding:"6px",fontWeight:600,color:"#e6edf3"}},avg(p.stats.pts,gp)),h("td",{style:{padding:"6px",color:"#8b949e"}},avg(p.stats.reb,gp)),h("td",{style:{padding:"6px",color:"#8b949e"}},avg(p.stats.ast,gp)),
+            h("td",{style:{padding:"6px",color:"#8b949e"}},pct(p.stats.fgm,p.stats.fga)+"%")
+          );
+        }))
+      )))
+    );
+  }
+
+  // Today / Playoffs
+  function vToday(){
+    if(state.phase==="playoffs"&&state.playoffs)return vPlayoffs();
+    if(state.phase==="offseason")return h("div",{className:"champ-banner fade-in"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:24,fontWeight:800,marginTop:12}},state.playoffs&&state.playoffs.champ?state.playoffs.champ.name+" are CHAMPIONS!":"Season Complete!"),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Start Next Season \u2192"));
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:16,color:ACCENT}},"Day "+state.currentDay),
+      todayG.map(function(g,i){
+        var aw=(state.teams||[])[g.away],hm=(state.teams||[])[g.home];
+        if(!aw||!hm)return null;
+        var idx=(state.schedule||[]).indexOf(g),pl=!!g.result;
+        return h("div",{key:i,style:{padding:"12px 16px",background:i%2===0?"#0d1117":"#1c2128",borderRadius:8,marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid #30363d",flexWrap:"wrap",gap:8}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:6,fontSize:14}},avatar(aw.name,aw.color,24),h("span",{style:{fontWeight:500,color:"#e6edf3"}},aw.name),h("span",{style:{color:"#484f58",margin:"0 4px"}},"@"),avatar(hm.name,hm.color,24),h("span",{style:{fontWeight:500,color:"#e6edf3"}},hm.name)),
+          pl?h("div",{style:{display:"flex",alignItems:"center",gap:8}},h("span",{style:{fontWeight:700,fontSize:15,color:"#e6edf3"}},g.result.awayScore+" - "+g.result.homeScore),h("button",{className:"pill",style:{background:PRIMARY,color:"#fff",fontSize:11,padding:"4px 12px"},onClick:function(){setSub({t:"box",d:idx})}},"Box")):
+          h("button",{style:{background:"#238636",color:"#fff",border:"none",borderRadius:6,padding:"6px 16px",fontWeight:700,fontSize:13,cursor:"pointer"},onClick:function(){simIdx(idx)}},"\u25B6 Sim")
+        );
+      }),
+      allDayDone&&!state.done?h("div",{style:{textAlign:"center",marginTop:16}},h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"12px 28px",fontWeight:700,fontSize:15,cursor:"pointer"},onClick:advDay},"Next Day \u2192")):null
+    );
+  }
+
+  // Playoffs view with conference brackets
+  function vPlayoffs(){
+    var po=state.playoffs;if(!po)return null;
+
+    function sCard(mu,conf,rd,idx){
+      if(!mu)return null;
+      var gArr=(mu.g||[]);
+      var done=mu.hW>=4||mu.lW>=4;
+      var win=done?(mu.hW>=4?mu.hN:mu.lN):null;
+      return h("div",{style:{padding:14,background:win?"linear-gradient(135deg,#1c2128,#2d1f00)":"#1c2128",borderRadius:10,marginBottom:8,border:win?"2px solid #FFD700":"1px solid #30363d",textAlign:"center"}},
+        h("div",{style:{fontSize:12,fontWeight:700,color:ACCENT,marginBottom:8}},rd.toUpperCase()),
+        h("div",{style:{display:"flex",justifyContent:"center",alignItems:"center",gap:16,marginBottom:8}},
+          h("div",null,avatar(mu.hN,COLORS2[mu.hN]||"#666",32),h("div",{style:{fontSize:11,fontWeight:600,marginTop:2,color:"#e6edf3"}},(mu.hN||"").split(" ").pop()),h("div",{style:{fontSize:20,fontWeight:800,color:mu.hW>=4?"#FFD700":"#e6edf3"}},mu.hW)),
+          h("span",{style:{color:"#484f58"}},"vs"),
+          h("div",null,avatar(mu.lN,COLORS2[mu.lN]||"#666",32),h("div",{style:{fontSize:11,fontWeight:600,marginTop:2,color:"#e6edf3"}},(mu.lN||"").split(" ").pop()),h("div",{style:{fontSize:20,fontWeight:800,color:mu.lW>=4?"#FFD700":"#e6edf3"}},mu.lW))
+        ),
+        done?h("div",{style:{fontWeight:700,color:"#FFD700",fontSize:13}},win+" advances!"):
+        h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:6,padding:"6px 16px",fontWeight:600,fontSize:12,cursor:"pointer"},onClick:function(){simPO(conf,rd,idx)}},"\u25B6 Game "+(gArr.length+1))
+      );
+    }
+
+    if(po.champ)return h("div",{className:"fade-in"},h("div",{className:"champ-banner"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:28,fontWeight:800,marginTop:12}},po.champ.name),h("div",{style:{fontSize:16,opacity:0.8}},"MDBA Champions - Season "+state.seasonNum),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Next Season \u2192")));
+
+    var eBrk=po.eastBracket||{};
+    var wBrk=po.westBracket||{};
+
+    return h("div",{className:"card fade-in"},h("h2",{style:{marginBottom:16,color:ACCENT}},"\uD83C\uDFC6 Playoffs"),
+      // Finals
+      po.finals?h("div",{style:{marginBottom:16}},h("h3",{style:{fontSize:14,marginBottom:8,color:"#FFD700"}},"\uD83C\uDFC6 MDBA FINALS"),sCard(po.finals,"","finals",0)):null,
+
+      // Conference Finals
+      (eBrk.confFinals||wBrk.confFinals)?h("div",{style:{marginBottom:16}},h("h3",{style:{fontSize:14,marginBottom:8,color:ACCENT}},"CONFERENCE FINALS"),
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+          eBrk.confFinals?h("div",null,h("div",{style:{fontSize:11,color:"#1f6feb",fontWeight:700,marginBottom:4}},"EAST"),sCard(eBrk.confFinals,"EAST","confFinals",0)):null,
+          wBrk.confFinals?h("div",null,h("div",{style:{fontSize:11,color:"#da3633",fontWeight:700,marginBottom:4}},"WEST"),sCard(wBrk.confFinals,"WEST","confFinals",0)):null
+        )
+      ):null,
+
+      // Semis
+      ((eBrk.semis&&(eBrk.semis||[]).length>0)||(wBrk.semis&&(wBrk.semis||[]).length>0))?h("div",{style:{marginBottom:16}},h("h3",{style:{fontSize:14,marginBottom:8,color:ACCENT}},"SEMIFINALS"),
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+          h("div",null,h("div",{style:{fontSize:11,color:"#1f6feb",fontWeight:700,marginBottom:4}},"EAST"),(eBrk.semis||[]).map(function(m,i){return h("div",{key:"es"+i},sCard(m,"EAST","semis",i))})),
+          h("div",null,h("div",{style:{fontSize:11,color:"#da3633",fontWeight:700,marginBottom:4}},"WEST"),(wBrk.semis||[]).map(function(m,i){return h("div",{key:"ws"+i},sCard(m,"WEST","semis",i))}))
+        )
+      ):null,
+
+      // Quarters
+      h("h3",{style:{fontSize:14,marginBottom:8,marginTop:16,color:ACCENT}},"QUARTERFINALS"),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}},
+        h("div",null,h("div",{style:{fontSize:11,color:"#1f6feb",fontWeight:700,marginBottom:4}},"EAST"),(eBrk.quarters||[]).map(function(m,i){return h("div",{key:"eq"+i},sCard(m,"EAST","quarters",i))})),
+        h("div",null,h("div",{style:{fontSize:11,color:"#da3633",fontWeight:700,marginBottom:4}},"WEST"),(wBrk.quarters||[]).map(function(m,i){return h("div",{key:"wq"+i},sCard(m,"WEST","quarters",i))}))
+      )
+    );
+  }
+
+  // Box Score
+  function vBox(gi){
+    var g=(state.schedule||[])[gi];if(!g||!g.result)return null;
+    var ht=(state.teams||[])[g.home],at=(state.teams||[])[g.away];if(!ht||!at)return null;
+    var r2=g.result;
+    function tb(nm,col,stats,isW){
+      var s2=(stats||[]).slice().sort(function(a,b){return a.ri-b.ri});
+      var tot={pts:0,reb:0,ast:0,stl:0,blk:0,to:0,fgm:0,fga:0,tpm:0,tpa:0,ftm:0,fta:0};
+      s2.forEach(function(p){for(var k in tot)tot[k]+=p[k]});
+      var rows=s2.map(function(p,i){var hl2=p.pts>=20?{color:"#FFD700",fontWeight:700}:{color:"#e6edf3"};
+        return h("tr",{key:p.name,style:{background:i%2===0?"#0d1117":"#161b22",borderTop:i===5?"3px solid "+PRIMARY:"none"}},
+          h("td",{style:Object.assign({padding:"6px"},hl2)},pLink(p.name)),h("td",{style:{padding:"6px"}},oB(p.ovr)),h("td",{style:{padding:"6px",color:"#8b949e"}},p.min),
+          h("td",{style:Object.assign({padding:"6px",fontWeight:700},hl2)},p.pts),h("td",{style:{padding:"6px",color:"#8b949e"}},p.reb),h("td",{style:{padding:"6px",color:"#8b949e"}},p.ast),h("td",{style:{padding:"6px",color:"#8b949e"}},p.stl),h("td",{style:{padding:"6px",color:"#8b949e"}},p.blk),
+          h("td",{style:{padding:"6px",color:"#8b949e"}},p.fgm+"/"+p.fga),h("td",{style:{padding:"6px",color:"#8b949e"}},p.tpm+"/"+p.tpa),h("td",{style:{padding:"6px",color:"#8b949e"}},p.ftm+"/"+p.fta))});
+      rows.push(h("tr",{key:"tot",style:{background:"#1c2128",fontWeight:700,color:"#e6edf3"}},h("td",{style:{padding:"6px"}},"TOTALS"),h("td",null,""),h("td",null,""),h("td",{style:{padding:"6px"}},tot.pts),h("td",{style:{padding:"6px"}},tot.reb),h("td",{style:{padding:"6px"}},tot.ast),h("td",{style:{padding:"6px"}},tot.stl),h("td",{style:{padding:"6px"}},tot.blk),h("td",{style:{padding:"6px"}},tot.fgm+"/"+tot.fga),h("td",{style:{padding:"6px"}},tot.tpm+"/"+tot.tpa),h("td",{style:{padding:"6px"}},tot.ftm+"/"+tot.fta)));
+      return h("div",{style:{marginBottom:16}},h("h3",{style:{marginBottom:6,fontSize:14,color:"#e6edf3"}},teamEmoji(nm)," ",nm,isW?" (W)":" (L)"),h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["PLAYER","OVR","MIN","PTS","REB","AST","STL","BLK","FG","3PT","FT"]),h("tbody",null,rows))));
+    }
+    return h("div",{className:"card fade-in"},
+      h("button",{className:"pill",style:{background:PRIMARY,color:"#fff",marginBottom:12},onClick:function(){setSub(null)}},"\u2190"),
+      h("div",{style:{textAlign:"center",padding:20,background:"linear-gradient(135deg,#161b22,#1c2128)",borderRadius:12,marginBottom:16,border:"1px solid #30363d"}},
+        h("div",{style:{display:"flex",justifyContent:"center",alignItems:"center",gap:30}},
+          h("div",null,avatar(at.name,at.color,36),h("div",{style:{fontSize:12,fontWeight:600,marginTop:4,color:"#e6edf3"}},at.name),h("div",{style:{fontSize:40,fontWeight:800,color:r2.awayScore>r2.homeScore?"#FFD700":"#484f58"}},r2.awayScore)),
+          h("div",{style:{fontSize:18,color:"#484f58"}},"@"),
+          h("div",null,avatar(ht.name,ht.color,36),h("div",{style:{fontSize:12,fontWeight:600,marginTop:4,color:"#e6edf3"}},ht.name),h("div",{style:{fontSize:40,fontWeight:800,color:r2.homeScore>r2.awayScore?"#FFD700":"#484f58"}},r2.homeScore)))),
+      tb(at.name,at.color,r2.awayStats,r2.awayScore>r2.homeScore),
+      tb(ht.name,ht.color,r2.homeStats,r2.homeScore>r2.awayScore)
+    );
+  }
+
+  // Headlines
+  function vHeadlines(){var hl=(state.headlines||[]).slice().reverse().slice(0,40);return h("div",{className:"card fade-in"},h("h2",{style:{marginBottom:16,color:ACCENT}},"\uD83D\uDCF0 Headlines"),hl.length===0?h("p",{style:{color:"#8b949e"}},"No news yet."):hl.map(function(x,i){return h("div",{key:i,className:"headline",style:{color:"#e6edf3"}},((x||{}).icon||"")+" "+((x||{}).text||""))}))}
+
+  // Standings with conference tabs
+  function vStandings(){
+    var allTeams=(state.teams||[]).slice();
+    var confTeams;
+    if(sTab==="EAST")confTeams=allTeams.filter(function(t){return t.conf==="EAST"});
+    else if(sTab==="WEST")confTeams=allTeams.filter(function(t){return t.conf==="WEST"});
+    else confTeams=allTeams;
+    var s2=confTeams.sort(function(a,b){return(b.wins/Math.max(b.wins+b.losses,1))-(a.wins/Math.max(a.wins+a.losses,1))||b.wins-a.wins});
+    var tw=s2[0]?s2[0].wins:0,tl=s2[0]?s2[0].losses:0;
+    var playoffLine=sTab==="Overall"?16:8;
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:12,color:ACCENT}},"Standings"),
+      h("div",{style:{display:"flex",gap:6,marginBottom:12}},
+        ["EAST","WEST","Overall"].map(function(tab){
+          return h("button",{key:tab,className:"pill",style:{background:sTab===tab?PRIMARY:"#21262d",color:sTab===tab?"#fff":"#8b949e"},onClick:function(){setSTab(tab)}},tab);
+        })
+      ),
+      h("div",{style:{fontSize:11,color:"#8b949e",marginBottom:8}},"Top "+playoffLine+" make playoffs (highlighted)"),
+      h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["#","TEAM","CONF","W","L","PCT","GB","PAYROLL"]),h("tbody",null,
+        s2.map(function(t,i){
+          var gp=t.wins+t.losses;
+          var wp=gp>0?(t.wins/gp).toFixed(3):".000";
+          var gb=gp>0?((tw-tl-t.wins+t.losses)/2):0;
+          var sal=(t.players||[]).reduce(function(s3,p){return s3+(p.salary||0)},0);
+          return h("tr",{key:t.name,style:{cursor:"pointer",background:i<playoffLine?(i%2===0?"#0d2818":"#122b1a"):(i%2===0?"#0d1117":"#161b22")},onClick:function(){setSub({t:"team",d:t.name})}},
+            h("td",{style:{padding:"8px 6px",fontWeight:700,color:ACCENT}},i+1),
+            h("td",{style:{padding:"8px 6px",fontWeight:600,color:"#e6edf3"}},h("span",{style:{marginRight:6}},teamEmoji(t.name)),t.name,dynastyBadge(t.name)),
+            h("td",{style:{padding:"8px 6px"}},confBadge(t.conf||getConf(t.name))),
+            h("td",{style:{padding:"8px 6px",fontWeight:700,color:"#e6edf3"}},t.wins),h("td",{style:{padding:"8px 6px",color:"#8b949e"}},t.losses),
+            h("td",{style:{padding:"8px 6px",color:"#8b949e"}},wp),h("td",{style:{padding:"8px 6px",color:"#8b949e"}},gb===0?"-":gb.toFixed(1)),
+            h("td",{style:{padding:"8px 6px"},className:"salary"},salStr(sal))
+          );
+        })
+      )))
+    );
+  }
+
+  // Schedule
+  function vSchedule(){
+    var days=[];var seen={};
+    (state.schedule||[]).forEach(function(g){if(!seen[g.day]){seen[g.day]=true;days.push(g.day)}});
+    days.sort(function(a,b){return a-b});
+    var pp=10,tp=Math.ceil(days.length/pp),pd=days.slice(sPage*pp,(sPage+1)*pp);
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:12,color:ACCENT}},"Schedule"),
+      h("div",{style:{display:"flex",gap:8,marginBottom:12,alignItems:"center"}},
+        h("button",{className:"pill",style:{background:PRIMARY,color:"#fff",fontSize:11,padding:"4px 12px"},onClick:function(){setSPage(Math.max(0,sPage-1))}},"\u2190"),
+        h("span",{style:{fontSize:12,color:"#8b949e"}},(sPage+1)+"/"+tp),
+        h("button",{className:"pill",style:{background:PRIMARY,color:"#fff",fontSize:11,padding:"4px 12px"},onClick:function(){setSPage(Math.min(tp-1,sPage+1))}},"\u2192")
+      ),
+      pd.map(function(day){
+        return h("div",{key:day,style:{marginBottom:12}},
+          h("div",{style:{fontSize:11,fontWeight:700,color:"#8b949e",marginBottom:4}},"DAY "+day),
+          (state.schedule||[]).filter(function(g){return g.day===day}).map(function(g,i){
+            var aw=(state.teams||[])[g.away],hm=(state.teams||[])[g.home];
+            if(!aw||!hm)return null;
+            var idx=(state.schedule||[]).indexOf(g),pl=!!g.result;
+            return h("div",{key:i,style:{padding:"6px 10px",background:pl?"#1c2128":"#0d1117",borderRadius:6,marginBottom:2,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:pl?"pointer":"default",border:"1px solid #21262d",fontSize:12},onClick:pl?function(){setSub({t:"box",d:idx})}:undefined},
+              h("span",{style:{color:"#e6edf3"}},teamEmoji(aw.name)," ",aw.name," @ ",teamEmoji(hm.name)," ",hm.name),
+              pl?h("span",{style:{fontWeight:700,color:"#e6edf3"}},g.result.awayScore+"-"+g.result.homeScore):h("span",{style:{color:"#484f58"}},"TBD")
+            );
+          })
+        );
+      })
+    );
+  }
+
+  // Leaders
+  function vLeaders(){
+    var cats=[{k:"pts",l:"Scoring"},{k:"reb",l:"Rebounds"},{k:"ast",l:"Assists"},{k:"stl",l:"Steals"},{k:"blk",l:"Blocks"}];
+    var all=[];
+    (state.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){if(p.stats.gp>=1)all.push(Object.assign({},p,{teamName:t.name,teamColor:COLORS2[t.name]}))})});
+    var sorted=all.slice().sort(function(a,b){return(b.stats[lCat]/b.stats.gp)-(a.stats[lCat]/a.stats.gp)}).slice(0,20);
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:12,color:ACCENT}},"Leaders"),
+      h("div",{style:{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}},cats.map(function(c){return h("button",{key:c.k,className:"pill",style:{background:lCat===c.k?PRIMARY:"#21262d",color:lCat===c.k?"#fff":"#8b949e"},onClick:function(){setLCat(c.k)}},c.l)})),
+      h("div",{style:{overflowX:"auto"}},h("table",null,tHead(["#","PLAYER","TEAM","OVR","POS","GP","AVG"]),h("tbody",null,
+        sorted.map(function(p,i){
+          return h("tr",{key:p.name+p.teamName,style:{background:i<3?"#2d1f00":i%2===0?"#0d1117":"#161b22"}},
+            h("td",{style:{padding:"8px 6px",fontWeight:i<3?700:400,color:i<3?"#FFD700":ACCENT}},i+1),
+            h("td",{style:{padding:"8px 6px"}},h("span",{style:{display:"flex",alignItems:"center",gap:6}},avatar(p.name,p.teamColor,24),pLink(p.name))),
+            h("td",{style:{padding:"8px 6px",fontSize:12,color:"#8b949e"}},teamEmoji(p.teamName)," ",p.teamName),
+            h("td",{style:{padding:"8px 6px"}},oB(p.ovr)),
+            h("td",{style:{padding:"8px 6px",color:"#8b949e"}},p.pos),
+            h("td",{style:{padding:"8px 6px",color:"#8b949e"}},p.stats.gp),
+            h("td",{style:{padding:"8px 6px",fontWeight:700,fontSize:14,color:i<3?"#FFD700":"#e6edf3"}},avg(p.stats[lCat],p.stats.gp))
+          );
+        })
+      )))
+    );
+  }
+
+  // Awards
+  function vAwards(){
+    var aw=getAwards(state);
+    var cats=[{k:"mvp",l:"MVP"},{k:"dpoy",l:"DPOY"},{k:"smoy",l:"6th Man"},{k:"mip",l:"MIP"},{k:"roy",l:"ROY"}];
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:16,color:ACCENT}},"Awards"),
+      cats.map(function(cat){
+        var c=(aw[cat.k]||[]);
+        if(!c.length)return h("div",{key:cat.k,style:{marginBottom:12}},h("h3",{style:{fontSize:14,color:"#e6edf3"}},cat.l),h("p",{style:{color:"#8b949e",fontSize:12}},"No eligible"));
+        return h("div",{key:cat.k,style:{marginBottom:20}},
+          h("h3",{style:{marginBottom:8,fontSize:14,color:"#e6edf3"}},cat.l),
+          c.map(function(p,i){
+            var gp=p.stats.gp;
+            return h("div",{key:p.name,style:i===0?{background:"linear-gradient(135deg,#2d1f00,#1c2128)",border:"2px solid #FFD700",borderRadius:10,padding:12,marginBottom:6}:{padding:"8px 12px",background:"#1c2128",borderRadius:8,marginBottom:4,border:"1px solid #30363d"}},
+              h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}},
+                h("div",{style:{display:"flex",alignItems:"center",gap:6}},avatar(p.name,p.teamColor,i===0?32:24),h("span",{style:{fontWeight:700,color:"#e6edf3"}},(i+1)+". "),pLink(p.name),oB(p.ovr),h("span",{style:{fontSize:11,color:"#8b949e"}},salStr(p.salary||0))),
+                h("span",{style:{fontSize:11,color:"#8b949e"}},avg(p.stats.pts,gp)+" PPG | "+avg(p.stats.reb,gp)+" RPG | "+avg(p.stats.ast,gp)+" APG")
+              )
+            );
+          })
+        );
+      })
+    );
+  }
+
+  // All-Star
+  function vAllStar(){
+    var as2=state.allStar;
+    if(!as2)return h("div",{className:"card fade-in"},h("h2",{style:{color:ACCENT}},"\u2B50 All-Star Weekend"),h("p",{style:{color:"#8b949e"}},"Complete the regular season to unlock All-Star Weekend!"));
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:16,color:ACCENT}},"\u2B50 All-Star Weekend"),
+      h("div",{style:{background:"linear-gradient(135deg,#0d1117,#1c2128)",color:"#fff",borderRadius:12,padding:20,marginBottom:16,textAlign:"center",border:"1px solid #30363d"}},h("h3",{style:{color:"#FFD700"}},"ALL-STAR GAME"),h("div",{style:{fontSize:36,fontWeight:800,marginTop:8}},as2.aScore+" - "+as2.bScore),h("div",{style:{fontSize:12,opacity:0.7,marginTop:4}},"MVP: "+(as2.mvp?as2.mvp.name:"N/A"))),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},
+        h("div",null,h("h4",{style:{marginBottom:6,fontSize:13,color:"#e6edf3"}},"Team A"),(as2.teamA||[]).map(function(p){return h("div",{key:p.name,style:{fontSize:12,padding:"4px 0",display:"flex",alignItems:"center",gap:6,color:"#e6edf3"}},avatar(p.name,p.color,20),pLink(p.name),oB(p.ovr))})),
+        h("div",null,h("h4",{style:{marginBottom:6,fontSize:13,color:"#e6edf3"}},"Team B"),(as2.teamB||[]).map(function(p){return h("div",{key:p.name,style:{fontSize:12,padding:"4px 0",display:"flex",alignItems:"center",gap:6,color:"#e6edf3"}},avatar(p.name,p.color,20),pLink(p.name),oB(p.ovr))}))
+      ),
+      h("h3",{style:{marginBottom:8,color:"#e6edf3"}},"\uD83C\uDFAF 3-Point Contest"),(as2.tpc||[]).map(function(p,i){return h("div",{key:p.name,style:{padding:"8px 12px",background:i===0?"linear-gradient(135deg,#2d1f00,#1c2128)":i%2===0?"#0d1117":"#1c2128",borderRadius:8,marginBottom:4,display:"flex",justifyContent:"space-between",border:i===0?"2px solid #FFD700":"1px solid #30363d",color:"#e6edf3"}},h("span",null,medal(i)," ",pLink(p.name)," (",p.team,")"),h("span",{style:{fontWeight:700}},p.made+"/25"))}),
+      h("h3",{style:{marginBottom:8,marginTop:16,color:"#e6edf3"}},"\uD83E\uDD3E Dunk Contest"),(as2.dunk||[]).map(function(p,i){return h("div",{key:p.name,style:{padding:"8px 12px",background:i===0?"linear-gradient(135deg,#2d1f00,#1c2128)":i%2===0?"#0d1117":"#1c2128",borderRadius:8,marginBottom:4,display:"flex",justifyContent:"space-between",border:i===0?"2px solid #FFD700":"1px solid #30363d",color:"#e6edf3"}},h("span",null,medal(i)," ",pLink(p.name)," (",p.team,")"),h("span",{style:{fontWeight:700}},p.r1+" + "+p.r2+" = "+p.total))})
+    );
+  }
+
+  // Draft
+  function vDraft(){
+    var d=state.lastDraft,r2=state.lastRetired;
+    return h("div",{className:"card fade-in"},
+      h("h2",{style:{marginBottom:16,color:ACCENT}},"\uD83C\uDFC0 Draft - Season "+state.seasonNum),
+      r2&&(r2||[]).length>0?h("div",{style:{marginBottom:20}},
+        h("h3",{style:{marginBottom:8,color:"#f85149",fontSize:14}},"\uD83D\uDC4B Retired ("+(r2||[]).length+")"),
+        (r2||[]).map(function(p,i){
+          return h("div",{key:(p.name||"")+i,style:{padding:"8px 12px",background:"#1c2128",borderRadius:6,marginBottom:3,fontSize:12,display:"flex",alignItems:"center",gap:6,border:"1px solid #30363d",color:"#e6edf3"}},
+            avatar(p.name,p.teamColor,24),
+            h("span",{style:{fontWeight:600}},p.name),oB(p.ovr),
+            h("span",{style:{color:"#8b949e"}},p.pos+" | Age "+p.age+" | "+p.team),
+            (p.peakOvr||0)>=85?h("span",{style:{background:"#FFD700",color:"#000",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,marginLeft:4}},"HOF"):null
+          );
+        })
+      ):null,
+      d?h("div",null,h("h3",{style:{marginBottom:8,fontSize:14,color:"#e6edf3"}},"Draft Picks"),
+        (d.picks||[]).map(function(p){
+          return h("div",{key:p.pick,style:{padding:"12px 16px",background:p.pick===1?"linear-gradient(135deg,#2d1f00,#1c2128)":p.pick%2===0?"#1c2128":"#0d1117",borderRadius:10,marginBottom:6,border:p.pick===1?"2px solid #FFD700":"1px solid #30363d"}},
+            h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+              h("span",{style:{fontWeight:800,color:"#FFD700",fontSize:16,minWidth:30}},"#"+p.pick),
+              avatar((p.player||{}).name||"?",p.teamColor,32),
+              h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.team),
+              h("span",{style:{fontWeight:700,color:"#e6edf3"}},(p.player||{}).name||"?"),
+              oB((p.player||{}).ovr||0),
+              h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | "+htStr((p.player||{}).ht||75)+" | Age "+((p.player||{}).age||20))
+            )
+          );
+        })
+      ):h("p",{style:{color:"#8b949e"}},"Complete a season first.")
+    );
+  }
+
+  // History / All-Time
+  function vHistory(){
+    var hist=(state.history||[]);
+    var hof=(state.hallOfFame||[]);
+    var ata=(state.allTimeAwards||[]);
+    return h("div",{className:"card fade-in"},
+      h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:16}},
+        h("h2",{style:{color:ACCENT}},"History & All-Time"),
+        hist.length>0?h("button",{style:{background:"#da3633",color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:12,cursor:"pointer"},onClick:deleteHistory},"Reset All"):null
+      ),
+
+      // Championship Counts
+      Object.keys(state.champCounts||{}).length>0?h("div",{style:{marginBottom:20}},
+        h("h3",{style:{fontSize:14,color:"#FFD700",marginBottom:8}},"\uD83C\uDFC6 Championship Counts"),
+        Object.keys(state.champCounts||{}).sort(function(a,b){return(state.champCounts||{})[b]-(state.champCounts||{})[a]}).map(function(name,i){
+          var cnt=(state.champCounts||{})[name]||0;
+          return h("div",{key:name,style:{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",background:i%2===0?"#0d1117":"#1c2128",borderRadius:6,marginBottom:2,border:"1px solid #21262d"}},
+            h("span",{style:{fontWeight:800,color:"#FFD700",minWidth:24}},cnt+"x"),
+            h("span",{style:{color:"#e6edf3"}},teamEmoji(name)," ",name),
+            cnt>=3?h("span",{className:"dynasty-badge"},"DYNASTY"):null
+          );
+        })
+      ):null,
+
+      // Hall of Fame
+      hof.length>0?h("div",{style:{marginBottom:20}},
+        h("h3",{style:{fontSize:14,color:"#FFD700",marginBottom:8}},"\uD83C\uDFDB Hall of Fame ("+hof.length+")"),
+        hof.slice().reverse().slice(0,20).map(function(p,i){
+          return h("div",{key:(p.name||"")+i,style:{padding:"6px 12px",background:i%2===0?"#0d1117":"#1c2128",borderRadius:6,marginBottom:2,fontSize:12,display:"flex",alignItems:"center",gap:6,border:"1px solid #21262d",color:"#e6edf3"}},
+            h("span",{style:{color:"#FFD700",fontWeight:700}},"\u2605"),
+            h("span",{style:{fontWeight:600}},p.name),
+            h("span",{style:{color:"#8b949e"}},p.pos+" | Peak: "+p.peakOvr+" | "+p.team+" | Inducted S"+p.inductedSeason)
+          );
+        })
+      ):null,
+
+      // All-Time Award Winners
+      ata.length>0?h("div",{style:{marginBottom:20}},
+        h("h3",{style:{fontSize:14,color:ACCENT,marginBottom:8}},"All-Time Award Winners"),
+        h("div",{style:{overflowX:"auto"}},h("table",null,
+          tHead(["Season","MVP","DPOY","6MOY","ROY","Champion"]),
+          h("tbody",null,ata.slice().reverse().map(function(a,i){
+            return h("tr",{key:i,style:{background:i%2===0?"#0d1117":"#161b22"}},
+              h("td",{style:{padding:"6px",fontWeight:700,color:ACCENT}},a.season),
+              h("td",{style:{padding:"6px",color:"#e6edf3"}},a.mvp),
+              h("td",{style:{padding:"6px",color:"#8b949e"}},a.dpoy),
+              h("td",{style:{padding:"6px",color:"#8b949e"}},a.smoy),
+              h("td",{style:{padding:"6px",color:"#8b949e"}},a.roy),
+              h("td",{style:{padding:"6px",color:"#FFD700",fontWeight:600}},a.champ)
+            );
+          }))
+        ))
+      ):null,
+
+      // Season History
+      hist.length===0?h("p",{style:{color:"#8b949e"}},"No completed seasons."):
+      h("div",null,h("h3",{style:{fontSize:14,color:ACCENT,marginBottom:8}},"Season Results"),
+        hist.map(function(s2,i){
+          return h("div",{key:(s2||{}).id||i,style:{padding:14,background:"#1c2128",borderRadius:10,marginBottom:8,border:"1px solid #30363d"}},
+            h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+              h("span",{style:{fontWeight:800,color:ACCENT}},"Season "+((s2||{}).sn||i+1)),
+              h("span",{style:{fontSize:18}},"\uD83C\uDFC6"),
+              h("span",{style:{fontWeight:600,color:"#FFD700"}},(s2||{}).champ),
+              h("span",{style:{fontSize:12,color:"#8b949e"}},"MVP: "+((s2||{}).mvp||"N/A")+" | "+((s2||{}).date||""))
+            )
+          );
+        })
+      )
+    );
+  }
+
+  // Layout
+  var tabs=[{k:"teams",l:"\uD83C\uDFC0 Teams"},{k:"today",l:state.phase==="playoffs"?"\uD83C\uDFC6 Playoffs":"Today"},{k:"headlines",l:"\uD83D\uDCF0 News"},{k:"standings",l:"Standings"},{k:"schedule",l:"Schedule"},{k:"leaders",l:"Leaders"},{k:"awards",l:"Awards"},{k:"allstar",l:"\u2B50 All-Star"},{k:"draft",l:"Draft"},{k:"history",l:"History"}];
+  function content(){
+    if(sub){if(sub.t==="team")return vTeam(sub.d);if(sub.t==="box")return vBox(sub.d)}
+    var v2={teams:vTeams,today:vToday,headlines:vHeadlines,standings:vStandings,schedule:vSchedule,leaders:vLeaders,awards:vAwards,allstar:vAllStar,draft:vDraft,history:vHistory};
+    return(v2[view]||vTeams)();
+  }
+  var played=(state.schedule||[]).filter(function(g){return g.result}).length;
+
+  return h("div",{style:{maxWidth:1000,margin:"0 auto",padding:"12px 16px"}},
+    renderModal(),
+    h("div",{style:{background:"linear-gradient(135deg,#161b22,#0d1117)",color:"#fff",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,borderRadius:12,marginBottom:16,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",border:"1px solid #30363d"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:12}},
+        h("span",{style:{fontSize:28,fontWeight:800,letterSpacing:2,background:"linear-gradient(135deg,#FFD700,"+PRIMARY+")",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}},"MDBA"),
+        h("div",{style:{fontSize:11,opacity:0.85}},
+          h("div",null,"Season "+(state.seasonNum||1)+" | "+state.phase.toUpperCase()+" | "+played+"/"+(state.schedule||[]).length+" | 30 Teams"),
+          h("div",{style:{display:"flex",alignItems:"center",gap:4,marginTop:2}},
+            h("span",{style:{display:"inline-block",width:7,height:7,borderRadius:"50%",background:conn?"#3fb950":"#f85149"}}),
+            h("span",{style:{fontSize:10,color:"#8b949e"}},conn?"LIVE":"OFFLINE")
+          )
+        )
+      ),
+      h("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        state.phase==="season"&&!state.done?h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:14,cursor:"pointer"},onClick:simDay},"\u25B6 Day"):null,
+        state.phase==="season"&&!state.done?h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:14,cursor:"pointer"},onClick:simWeek},"\u25B6\u25B6 Week"):null,
+        state.phase==="season"&&!state.done?h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:14,cursor:"pointer"},onClick:simAll},"\u23E9 All"):null,
+        h("button",{style:{background:"#21262d",color:"#8b949e",border:"1px solid #30363d",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:14,cursor:"pointer"},onClick:resetAll},"\u21BA")
+      )
+    ),
+    h("div",{style:{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap",overflowX:"auto"}},tabs.map(function(t){return h("button",{key:t.k,className:"pill",style:{background:view===t.k&&!sub?PRIMARY:"#21262d",color:view===t.k&&!sub?"#fff":"#8b949e"},onClick:function(){setView(t.k);setSub(null)}},t.l)})),
+    content()
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
