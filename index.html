@@ -44,7 +44,13 @@ button{cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root" style="color:#fff;padding:20px">Loading MDBA...</div>
+<script>
+window.onerror=function(msg,url,line,col,err){
+  document.getElementById("root").innerHTML="<div style='background:#fff;color:red;padding:30px;font-family:monospace;border-radius:8px;margin:20px'><h2>MDBA Error</h2><p><b>"+msg+"</b></p><p>Line: "+line+", Col: "+col+"</p><pre>"+(err?err.stack:"no stack")+"</pre><button onclick=location.reload()>Reload</button></div>";
+  return true;
+};
+</script>
 <script>
 firebase.initializeApp({apiKey:"AIzaSyBUwsU6Aj6sTP5Eyc-lSMtXluAReB5j-LU",authDomain:"mdba-simulator.firebaseapp.com",databaseURL:"https://mdba-simulator-default-rtdb.firebaseio.com",projectId:"mdba-simulator",storageBucket:"mdba-simulator.firebasestorage.app",messagingSenderId:"625372009483",appId:"1:625372009483:web:b3eaf88e76959b313b230e"});
 var db=firebase.database(),gameRef=db.ref("mdba8");
