@@ -1071,22 +1071,18 @@ function App(){
     var used=new Set();
     (n.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){used.add(p.name)})});
     var pros;
-    if(n.upcomingProspects&&(n.upcomingProspects||[]).length>=nP){
+    // ALWAYS use stored prospects first - these are the same players shown in the Prospects tab
+    if(n.upcomingProspects&&(n.upcomingProspects||[]).length>0){
       pros=(n.upcomingProspects||[]).slice();
+      // Add extras only if we need more than what was pre-generated
       while(pros.length<nP){
         var pos2=pick(["PG","SG","SF","PF","C"]);var age2=R(19,22);
-        var pct3=1-(pros.length/nP);var ovr2=clamp(Math.round(62+pct3*26+G(0,4)),58,92);
+        var pct3=1-(pros.length/nP);var ovr2=clamp(Math.round(62+pct3*20+G(0,4)),58,78);
         var nm2=genName(used);used.add(nm2);
         pros.push({name:nm2,pos:pos2,age:age2,ovr:ovr2,ht:R(HT[pos2][0],HT[pos2][1]),wt:R(WT[pos2][0],WT[pos2][1]),info:genScoutReport(pos2,ovr2),college:pick(COLLEGES),draftRank:pros.length+1});
       }
     } else {
-      pros=[];
-      for(var pi=0;pi<nP;pi++){
-        var pos=pick(["PG","SG","SF","PF","C"]);var age=R(19,22);
-        var pct2=1-(pi/nP);var ovr=clamp(Math.round(62+pct2*26+G(0,4)),58,92);
-        var nm=genName(used);used.add(nm);
-        pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:genScoutReport(pos,ovr),college:pick(COLLEGES),draftRank:pi+1});
-      }
+      pros=generateProspects(n.teams||[]);
     }
     pros.sort(function(a,b){return b.ovr-a.ovr});
     pros.forEach(function(p,i){p.draftRank=i+1});
