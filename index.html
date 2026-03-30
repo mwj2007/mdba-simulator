@@ -41,6 +41,17 @@ button{cursor:pointer;font-family:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes fadeIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn 0.3s ease-out}
+@keyframes draftReveal{0%{opacity:0;transform:scale(0.8) rotateY(90deg)}60%{transform:scale(1.05) rotateY(0deg)}100%{opacity:1;transform:scale(1) rotateY(0deg)}}
+.draft-reveal{animation:draftReveal 0.6s ease-out}
+@keyframes lotteryReveal{0%{opacity:0;transform:translateX(-20px)}100%{opacity:1;transform:translateX(0)}}
+.lottery-reveal{animation:lotteryReveal 0.4s ease-out}
+.draft-pick-card{background:linear-gradient(135deg,#161b22,#1c2128);border-radius:12px;padding:16px;margin-bottom:10px;border:1px solid #30363d;transition:all .3s}
+.draft-pick-card.top5{border:2px solid #FFD700;box-shadow:0 0 20px rgba(255,215,0,0.2)}
+.draft-pick-card.top15{border:2px solid #C0C0C0;box-shadow:0 0 12px rgba(192,192,192,0.15)}
+.draft-ticker{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;gap:12px;overflow-x:auto;font-size:11px}
+.draft-ticker-item{white-space:nowrap;color:#8b949e;flex-shrink:0}
+.waived-tag{background:#da3633;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
+.retired-tag{background:#8b949e;color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
 </style>
 </head>
 <body>
@@ -427,13 +438,52 @@ function ageRetire(teams){
       if(!p.ovrHistory)p.ovrHistory=[];
       p.ovrHistory.push(p.ovr);
       p.contractYrs=Math.max(0,(p.contractYrs||1)-1);
+      // Only retire at 38+
       var ch=0;
-      if(p.age>=38)ch=1;else if(p.age>=37)ch=0.9;else if(p.age>=36)ch=0.75;else if(p.age>=35)ch=0.55;else if(p.age>=34)ch=0.35;
-      if(Math.random()<ch){rm.push(i);ret.push({name:p.name,pos:p.pos,age:p.age,ovr:p.ovr,ht:p.ht,wt:p.wt,team:t.name,teamColor:t.color,peakOvr:Math.max.apply(null,p.ovrHistory||[p.ovr])})}
+      if(p.age>=38)ch=1;else if(p.age>=37)ch=0.9;
+      if(Math.random()<ch){rm.push(i);ret.push({name:p.name,pos:p.pos,age:p.age,ovr:p.ovr,ht:p.ht,wt:p.wt,team:t.name,teamColor:t.color,peakOvr:Math.max.apply(null,p.ovrHistory||[p.ovr]),reason:"retired"})}
     });
     rm.sort(function(a,b){return b-a}).forEach(function(i){t.players.splice(i,1)});
   });
   return ret;
+}
+
+function cutPlayers(teams,draftOrder){
+  var ROSTER_LIMIT=8;
+  var cuts=[];
+  (teams||[]).forEach(function(t){
+    // Count how many draft picks this team has
+    var teamPicks=0;
+    (draftOrder||[]).forEach(function(tn){if(tn===t.name)teamPicks++});
+    if(teamPicks===0)teamPicks=1;
+    var targetSize=ROSTER_LIMIT-teamPicks;
+    if(targetSize<3)targetSize=3;
+    // Auto-cut: players over 34 with OVR < 70
+    var autoCutIdxs=[];
+    (t.players||[]).forEach(function(p,i){
+      if(p.age>34&&p.ovr<70)autoCutIdxs.push(i);
+    });
+    autoCutIdxs.sort(function(a,b){return b-a}).forEach(function(i){
+      var p=t.players[i];
+      cuts.push({name:p.name,pos:p.pos,ovr:p.ovr,age:p.age,ht:p.ht,wt:p.wt,team:t.name,teamColor:t.color,peakOvr:Math.max.apply(null,p.ovrHistory||[p.ovr]),reason:"waived"});
+      t.players.splice(i,1);
+    });
+    // Now cut lowest OVR players to hit target, factoring in age
+    while((t.players||[]).length>targetSize&&(t.players||[]).length>3){
+      // Score each player: lower = more likely to be cut
+      var worst=-1;var worstScore=9999;
+      (t.players||[]).forEach(function(p,i){
+        var score=p.ovr-(p.age>30?(p.age-30)*2:0);
+        if(score<worstScore){worstScore=score;worst=i}
+      });
+      if(worst>=0){
+        var p2=t.players[worst];
+        cuts.push({name:p2.name,pos:p2.pos,ovr:p2.ovr,age:p2.age,ht:p2.ht,wt:p2.wt,team:t.name,teamColor:t.color,peakOvr:Math.max.apply(null,p2.ovrHistory||[p2.ovr]),reason:"waived"});
+        t.players.splice(worst,1);
+      } else {break}
+    }
+  });
+  return cuts;
 }
 
 function runDraft(teams,nr,storedProspects){
@@ -628,7 +678,7 @@ function fixArrays(v){
     }
     fixArr(v,"teams");fixArr(v,"schedule");fixArr(v,"history");fixArr(v,"freeAgents");
     fixArr(v,"allRetired");fixArr(v,"headlines");fixArr(v,"allTimeAwards");fixArr(v,"allTimeStatLeaders");fixArr(v,"hallOfFame");
-    fixArr(v,"upcomingProspects");
+    fixArr(v,"upcomingProspects");fixArr(v,"draftHistory");fixArr(v,"draftLotteryOrder");fixArr(v,"draftProspects");fixArr(v,"draftPicks");fixArr(v,"draftCuts");
     if(v.teams)(v.teams||[]).forEach(function(t){
       fixArr(t,"players");
       if(t.players)(t.players||[]).forEach(function(p){
@@ -665,6 +715,7 @@ function fixArrays(v){
       fixArr(v.lastDraft,"picks");fixArr(v.lastDraft,"undrafted");
     }
     fixArr(v,"lastRetired");
+    if(v.draftHistory)(v.draftHistory||[]).forEach(function(dh){if(dh){fixArr(dh,"picks");fixArr(dh,"cuts")}});
     if(v.allStar){
       fixArr(v.allStar,"teamA");fixArr(v.allStar,"teamB");
       fixArr(v.allStar,"tpc");fixArr(v.allStar,"dunk");
@@ -830,7 +881,7 @@ function App(){
   function buildInit(){
     var t=initTeams(),s=genSchedule(t);
     var pros=generateProspects(t);
-    return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:1,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:[],playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{},upcomingProspects:pros};
+    return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:1,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:[],playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{},upcomingProspects:pros,draftHistory:[],draftPhase:null,draftLotteryOrder:[],draftLotteryRevealed:0,draftProspects:[],draftPicks:[],draftPicksMade:0,draftCuts:[]};
   }
   function sync(s2){var w2="w"+Date.now()+Math.random();lwid.current=w2;s2._wid=w2;s2.version=VERSION;setState(s2);gameRef.set(s2)}
 
@@ -955,8 +1006,162 @@ function App(){
       }
     });
     n.teams.forEach(function(t){t.players.forEach(function(p){p.rookie=false})});
-    var draft=runDraft(n.teams,ret.length,n.upcomingProspects);
-    var fa=(draft.undrafted||[]).map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
+
+    // Build draft lottery order (worst to best)
+    var sorted=(n.teams||[]).slice().sort(function(a,b){return(a.wins/Math.max(a.wins+a.losses,1))-(b.wins/Math.max(b.wins+b.losses,1))});
+    var wts=sorted.map(function(_,i){return sorted.length-i+R(0,3)});
+    var order=[];var ui=new Set();
+    while(order.length<sorted.length){
+      var tt=0;for(var i2=0;i2<wts.length;i2++)if(!ui.has(i2))tt+=wts[i2];
+      var r2=Math.random()*tt;
+      for(var i3=0;i3<sorted.length;i3++){
+        if(ui.has(i3))continue;r2-=wts[i3];
+        if(r2<=0){order.push(sorted[i3].name);ui.add(i3);break}
+      }
+      if(ui.size<order.length+1){for(var i4=0;i4<sorted.length;i4++){if(!ui.has(i4)){order.push(sorted[i4].name);ui.add(i4)}}}
+    }
+
+    // Generate prospects
+    var np=(n.teams||[]).length;
+    var nP=Math.max(np,ret.length)+6;
+    var used=new Set();
+    (n.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){used.add(p.name)})});
+    var pros;
+    if(n.upcomingProspects&&(n.upcomingProspects||[]).length>=nP){
+      pros=(n.upcomingProspects||[]).slice();
+      while(pros.length<nP){
+        var pos2=pick(["PG","SG","SF","PF","C"]);var age2=R(19,22);
+        var pct3=1-(pros.length/nP);var ovr2=clamp(Math.round(62+pct3*26+G(0,4)),58,92);
+        var nm2=genName(used);used.add(nm2);
+        pros.push({name:nm2,pos:pos2,age:age2,ovr:ovr2,ht:R(HT[pos2][0],HT[pos2][1]),wt:R(WT[pos2][0],WT[pos2][1]),info:genScoutReport(pos2,ovr2),college:pick(COLLEGES),draftRank:pros.length+1});
+      }
+    } else {
+      pros=[];
+      for(var pi=0;pi<nP;pi++){
+        var pos=pick(["PG","SG","SF","PF","C"]);var age=R(19,22);
+        var pct2=1-(pi/nP);var ovr=clamp(Math.round(62+pct2*26+G(0,4)),58,92);
+        var nm=genName(used);used.add(nm);
+        pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:genScoutReport(pos,ovr),college:pick(COLLEGES),draftRank:pi+1});
+      }
+    }
+    pros.sort(function(a,b){return b.ovr-a.ovr});
+    pros.forEach(function(p,i){p.draftRank=i+1});
+
+    // Cut players to make room for draft picks
+    var cutResults=cutPlayers(n.teams,order);
+
+    // Set up draft state
+    n.phase="draft";
+    n.draftPhase="offseason";
+    n.lastRetired=ret;
+    n.draftLotteryOrder=order;
+    n.draftLotteryRevealed=0;
+    n.draftProspects=pros;
+    n.draftPicks=[];
+    n.draftPicksMade=0;
+    n.draftCuts=cutResults;
+    if(!n.allRetired)n.allRetired=[];
+    n.allRetired=(n.allRetired||[]).concat(ret).concat(cutResults.filter(function(c){return c.reason==="retired"}));
+    sync(n);setView("draft");setSub(null);
+  }
+
+  function proceedToLottery(){
+    var n=DC(state);
+    n.draftPhase="lottery";
+    sync(n);
+  }
+
+  function revealLotteryPick(){
+    var n=DC(state);
+    var total=(n.draftLotteryOrder||[]).length;
+    if((n.draftLotteryRevealed||0)<total){
+      n.draftLotteryRevealed=(n.draftLotteryRevealed||0)+1;
+    }
+    sync(n);
+  }
+
+  function revealAllLottery(){
+    var n=DC(state);
+    n.draftLotteryRevealed=(n.draftLotteryOrder||[]).length;
+    sync(n);
+  }
+
+  function draftNextPick(){
+    var n=DC(state);
+    var pickNum=(n.draftPicksMade||0);
+    var order=(n.draftLotteryOrder||[]);
+    var avail=(n.draftProspects||[]).slice();
+    if(pickNum>=order.length||avail.length===0)return;
+    // Remove already drafted prospects
+    var draftedNames={};
+    (n.draftPicks||[]).forEach(function(dp){draftedNames[dp.player.name]=true});
+    avail=avail.filter(function(p){return!draftedNames[p.name]});
+    if(avail.length===0)return;
+    var teamName=order[pickNum];
+    var tm=(n.teams||[]).find(function(t){return t.name===teamName});
+    if(!tm)return;
+    var ch=avail[0];
+    var draftedP=makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info);
+    draftedP.rookie=true;
+    tm.players.push(draftedP);
+    tm.players.sort(function(a,b){return b.ovr-a.ovr});
+    if(!n.draftPicks)n.draftPicks=[];
+    n.draftPicks.push({pick:pickNum+1,team:teamName,teamColor:COLORS2[teamName]||"#666",player:{name:ch.name,pos:ch.pos,age:ch.age,ovr:ch.ovr,ht:ch.ht,wt:ch.wt,info:ch.info,college:ch.college,comparison:ch.comparison||""}});
+    n.draftPicksMade=pickNum+1;
+    if(n.draftPicksMade>=order.length||avail.length<=1){
+      n.draftPhase="summary";
+    }
+    sync(n);
+  }
+
+  function autoDraftAll(){
+    var n=DC(state);
+    var order=(n.draftLotteryOrder||[]);
+    var avail=(n.draftProspects||[]).slice();
+    var draftedNames={};
+    (n.draftPicks||[]).forEach(function(dp){draftedNames[dp.player.name]=true});
+    avail=avail.filter(function(p){return!draftedNames[p.name]});
+    var pickNum=(n.draftPicksMade||0);
+    while(pickNum<order.length&&avail.length>0){
+      var teamName=order[pickNum];
+      var tm=(n.teams||[]).find(function(t){return t.name===teamName});
+      if(!tm){pickNum++;continue}
+      var ch=avail.shift();
+      var draftedP=makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info);
+      draftedP.rookie=true;
+      tm.players.push(draftedP);
+      tm.players.sort(function(a,b){return b.ovr-a.ovr});
+      if(!n.draftPicks)n.draftPicks=[];
+      n.draftPicks.push({pick:pickNum+1,team:teamName,teamColor:COLORS2[teamName]||"#666",player:{name:ch.name,pos:ch.pos,age:ch.age,ovr:ch.ovr,ht:ch.ht,wt:ch.wt,info:ch.info,college:ch.college,comparison:ch.comparison||""}});
+      pickNum++;
+    }
+    n.draftPicksMade=pickNum;
+    n.draftPhase="summary";
+    sync(n);
+  }
+
+  function finishDraft(){
+    var n=DC(state);
+    // Save draft history
+    if(!n.draftHistory)n.draftHistory=[];
+    n.draftHistory.push({
+      seasonNum:n.seasonNum,
+      picks:(n.draftPicks||[]).slice(),
+      cuts:(n.draftCuts||[]).concat((n.lastRetired||[]).map(function(r){return{name:r.name,pos:r.pos,ovr:r.ovr,team:r.team,reason:r.reason||"retired"}}))
+    });
+    // Build undrafted as free agents
+    var draftedNames={};
+    (n.draftPicks||[]).forEach(function(dp){draftedNames[dp.player.name]=true});
+    var undrafted=(n.draftProspects||[]).filter(function(p){return!draftedNames[p.name]});
+    var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
+    // Add cut players to free agent pool
+    (n.draftCuts||[]).forEach(function(c){
+      if(c.reason==="waived"){
+        fa.push(makePlayer(c.name,c.pos,c.age||25,c.ovr,c.ht,c.wt,"Former "+c.team+" player"));
+      }
+    });
+    // Save lastDraft for compatibility
+    n.lastDraft={picks:(n.draftPicks||[]).slice(),undrafted:undrafted};
     // Free agent signing / luxury tax logic
     (n.teams||[]).forEach(function(t){
       t.wins=0;t.losses=0;t.hotSeat=false;
@@ -967,7 +1172,6 @@ function App(){
         if(p.contractYrs<=0){
           p.salary=genSalary(p.ovr,p.age);
           p.contractYrs=R(1,4);
-          // luxury tax: teams over luxury line can only sign cheap deals
           if(totalPayroll>luxuryLine){
             p.salary=Math.round(p.salary*0.6);
             p.contractYrs=Math.min(p.contractYrs,2);
@@ -977,14 +1181,15 @@ function App(){
       t.capSpace=140000000-(t.players||[]).reduce(function(s,p){return s+p.salary},0);
     });
     n.schedule=genSchedule(n.teams);n.currentDay=1;n.done=false;
-    n.seasonNum=(n.seasonNum||1)+1;n.lastDraft=draft;n.lastRetired=ret;n.freeAgents=fa;
+    n.seasonNum=(n.seasonNum||1)+1;n.freeAgents=fa;
     n.playoffs=null;n.allStar=null;n.phase="season";n.headlines=[];
     n.upcomingProspects=generateProspects(n.teams);
+    // Clean up draft state
+    n.draftPhase=null;n.draftLotteryOrder=[];n.draftLotteryRevealed=0;
+    n.draftProspects=[];n.draftPicks=[];n.draftPicksMade=0;n.draftCuts=[];
     // Reset trade demands and normalize morale
     (n.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){p.tradeDemand=false;if(!p.morale)p.morale=R(60,100);if(!p.personality)p.personality=pick(PERSONALITIES)})});
-    if(!n.allRetired)n.allRetired=[];
-    n.allRetired=(n.allRetired||[]).concat(ret);
-    sync(n);setView("draft");setSub(null);
+    sync(n);setView("teams");setSub(null);
   }
 
   function resetAll(){if(!confirm("Reset EVERYTHING? Returns to original rosters."))return;sync(buildInit());setView("teams");setSub(null)}
@@ -1227,7 +1432,8 @@ function App(){
   // Today / Playoffs
   function vToday(){
     if(state.phase==="playoffs"&&state.playoffs)return vPlayoffs();
-    if(state.phase==="offseason")return h("div",{className:"champ-banner fade-in"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:24,fontWeight:800,marginTop:12}},state.playoffs&&state.playoffs.champ?state.playoffs.champ.name+" are CHAMPIONS!":"Season Complete!"),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Start Next Season \u2192"));
+    if(state.phase==="draft")return vDraft();
+    if(state.phase==="offseason")return h("div",{className:"champ-banner fade-in"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:24,fontWeight:800,marginTop:12}},state.playoffs&&state.playoffs.champ?state.playoffs.champ.name+" are CHAMPIONS!":"Season Complete!"),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Start Offseason \u2192"));
     return h("div",{className:"card fade-in"},
       h("h2",{style:{marginBottom:16,color:ACCENT}},"Day "+state.currentDay),
       todayG.map(function(g,i){
@@ -1268,7 +1474,7 @@ function App(){
       );
     }
 
-    if(po.champ)return h("div",{className:"fade-in"},h("div",{className:"champ-banner"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:28,fontWeight:800,marginTop:12}},po.champ.name),h("div",{style:{fontSize:16,opacity:0.8}},"MDBA Champions - Season "+state.seasonNum),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Next Season \u2192")));
+    if(po.champ)return h("div",{className:"fade-in"},h("div",{className:"champ-banner"},h("div",{style:{fontSize:60}},"\uD83C\uDFC6"),h("div",{style:{fontSize:28,fontWeight:800,marginTop:12}},po.champ.name),h("div",{style:{fontSize:16,opacity:0.8}},"MDBA Champions - Season "+state.seasonNum),h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer",marginTop:20},onClick:nextSeason},"Start Offseason \u2192")));
 
     var eBrk=po.eastBracket||{};
     var wBrk=po.westBracket||{};
@@ -1474,35 +1680,310 @@ function App(){
 
   // Draft
   function vDraft(){
-    var d=state.lastDraft,r2=state.lastRetired;
+    var dp=state.draftPhase;
+    var r2=state.lastRetired;
+    var cuts=(state.draftCuts||[]);
+    var order=(state.draftLotteryOrder||[]);
+    var revealed=(state.draftLotteryRevealed||0);
+    var picks=(state.draftPicks||[]);
+    var picksMade=(state.draftPicksMade||0);
+
+    // If not in interactive draft mode, show last draft results
+    if(state.phase!=="draft"){
+      var d=state.lastDraft;
+      return h("div",{className:"card fade-in"},
+        h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+          h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"MDBA DRAFT"),
+          h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum)
+        ),
+        d?h("div",null,h("h3",{style:{marginBottom:8,fontSize:14,color:"#e6edf3"}},"Draft Picks"),
+          (d.picks||[]).map(function(p){
+            var cardClass="draft-pick-card";
+            if(p.pick<=5)cardClass=cardClass+" top5";
+            else if(p.pick<=15)cardClass=cardClass+" top15";
+            return h("div",{key:p.pick,className:cardClass},
+              h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+                h("span",{style:{fontWeight:800,color:p.pick<=5?"#FFD700":p.pick<=15?"#C0C0C0":"#8b949e",fontSize:18,minWidth:36}},"#"+p.pick),
+                avatar((p.player||{}).name||"?",p.teamColor,32),
+                h("span",{style:{fontWeight:600,color:"#e6edf3"}},teamEmoji(p.team)+" "+p.team),
+                h("span",{style:{fontWeight:700,color:"#e6edf3",fontSize:15}},(p.player||{}).name||"?"),
+                oB((p.player||{}).ovr||0),
+                h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | "+htStr((p.player||{}).ht||75)+" | Age "+((p.player||{}).age||20)),
+                (p.player||{}).info?h("div",{className:"scout-report",style:{marginTop:6,width:"100%"}},(p.player||{}).info):null
+              )
+            );
+          })
+        ):h("p",{style:{color:"#8b949e"}},"Complete a season first."),
+        vDraftHistory()
+      );
+    }
+
+    // INTERACTIVE DRAFT MODE
+    // Offseason summary phase
+    if(dp==="offseason"){
+      return h("div",{className:"card fade-in"},
+        h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+          h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"OFFSEASON"),
+          h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum)
+        ),
+        // Retired players
+        r2&&(r2||[]).length>0?h("div",{style:{marginBottom:20}},
+          h("h3",{style:{marginBottom:8,color:"#f85149",fontSize:14}},"\uD83D\uDC4B Retired ("+(r2||[]).length+")"),
+          (r2||[]).map(function(p,i){
+            return h("div",{key:(p.name||"")+i,style:{padding:"8px 12px",background:"#1c2128",borderRadius:6,marginBottom:3,fontSize:12,display:"flex",alignItems:"center",gap:6,border:"1px solid #30363d",color:"#e6edf3"}},
+              avatar(p.name,p.teamColor,24),
+              h("span",{style:{fontWeight:600}},p.name),oB(p.ovr),
+              h("span",{style:{color:"#8b949e"}},p.pos+" | Age "+p.age+" | "+p.team),
+              h("span",{className:"retired-tag"},"RETIRED"),
+              (p.peakOvr||0)>=85?h("span",{style:{background:"#FFD700",color:"#000",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,marginLeft:4}},"HOF"):null
+            );
+          })
+        ):null,
+        // Waived/Cut players
+        cuts.length>0?h("div",{style:{marginBottom:20}},
+          h("h3",{style:{marginBottom:8,color:"#da3633",fontSize:14}},"\u2702 Roster Cuts ("+cuts.length+")"),
+          cuts.map(function(p,i){
+            return h("div",{key:(p.name||"")+i,style:{padding:"8px 12px",background:"#1c2128",borderRadius:6,marginBottom:3,fontSize:12,display:"flex",alignItems:"center",gap:6,border:"1px solid #30363d",color:"#e6edf3"}},
+              avatar(p.name,p.teamColor||"#666",24),
+              h("span",{style:{fontWeight:600}},p.name),oB(p.ovr),
+              h("span",{style:{color:"#8b949e"}},p.pos+" | Age "+(p.age||"?")),
+              h("span",{style:{color:"#8b949e"}},p.team),
+              h("span",{className:"waived-tag"},"WAIVED")
+            );
+          })
+        ):null,
+        h("div",{style:{textAlign:"center",marginTop:20}},
+          h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:proceedToLottery},"Proceed to Draft Lottery \u2192"))
+      );
+    }
+
+    // Lottery phase
+    if(dp==="lottery"){
+      var total=order.length;
+      var allRevealed=revealed>=total;
+      return h("div",{className:"card fade-in"},
+        h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+          h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"DRAFT LOTTERY"),
+          h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum+" | "+revealed+"/"+total+" revealed")
+        ),
+        h("div",{style:{marginBottom:16,display:"flex",gap:8,justifyContent:"center"}},
+          !allRevealed?h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:14,cursor:"pointer"},onClick:revealLotteryPick},"Reveal Pick #"+(total-revealed)):null,
+          !allRevealed?h("button",{style:{background:"#21262d",color:"#8b949e",border:"1px solid #30363d",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:14,cursor:"pointer"},onClick:revealAllLottery},"Reveal All"):null,
+          allRevealed?h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:function(){var n=DC(state);n.draftPhase="drafting";sync(n)}},"Begin Draft \u2192"):null
+        ),
+        // Show picks from #30 (last) to #1 (first), revealed from bottom up
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}},
+          (function(){
+            var cards=[];
+            for(var ri=total-1;ri>=0;ri--){
+              var pickIdx=ri;
+              var revealIdx=total-1-ri;
+              var isRevealed=revealIdx<revealed;
+              var teamName=order[pickIdx];
+              var color2=COLORS2[teamName]||"#666";
+              var pickClass=pickIdx<5?"top5":pickIdx<15?"top15":"";
+              cards.push(h("div",{key:ri,className:isRevealed?"lottery-reveal":"",style:{background:isRevealed?"linear-gradient(135deg,#161b22,#1c2128)":"#0d1117",borderRadius:10,padding:12,border:isRevealed?(pickIdx<5?"2px solid #FFD700":pickIdx<15?"2px solid #C0C0C0":"1px solid #30363d"):"1px solid #21262d",textAlign:"center",opacity:isRevealed?1:0.3}},
+                h("div",{style:{fontWeight:800,color:pickIdx<5?"#FFD700":pickIdx<15?"#C0C0C0":"#8b949e",fontSize:14}},"Pick #"+(pickIdx+1)),
+                isRevealed?h("div",{style:{marginTop:6}},
+                  h("div",{style:{fontSize:20}},teamEmoji(teamName)),
+                  h("div",{style:{fontSize:11,fontWeight:700,color:"#e6edf3",marginTop:4}},(teamName||"").split(" ").pop()),
+                  h("div",{style:{width:20,height:3,background:color2,borderRadius:2,margin:"4px auto"}})
+                ):h("div",{style:{fontSize:20,marginTop:6,color:"#484f58"}},"?")
+              ));
+            }
+            return cards;
+          })()
+        )
+      );
+    }
+
+    // Drafting phase - pick by pick
+    if(dp==="drafting"){
+      var totalPicks=order.length;
+      var availProspects=(state.draftProspects||[]).slice();
+      var draftedNames2={};
+      picks.forEach(function(dp2){draftedNames2[dp2.player.name]=true});
+      availProspects=availProspects.filter(function(p){return!draftedNames2[p.name]});
+      var nextTeam=picksMade<totalPicks?order[picksMade]:null;
+      var nextProspect=availProspects.length>0?availProspects[0]:null;
+      var allDrafted=picksMade>=totalPicks||availProspects.length===0;
+
+      return h("div",{className:"card fade-in"},
+        h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+          h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"MDBA DRAFT"),
+          h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum+" | Pick "+(picksMade+1)+"/"+totalPicks)
+        ),
+        // Ticker of recent picks
+        picks.length>0?h("div",{className:"draft-ticker"},
+          picks.slice().reverse().slice(0,8).map(function(pk){
+            return h("span",{key:pk.pick,className:"draft-ticker-item"},
+              h("span",{style:{color:"#FFD700",fontWeight:700}},"#"+pk.pick+" "),
+              h("span",{style:{color:"#e6edf3"}},pk.player.name+" "),
+              h("span",{style:{color:"#8b949e"}},"("+pk.team.split(" ").pop()+")")
+            );
+          })
+        ):null,
+        // Controls
+        h("div",{style:{marginBottom:16,display:"flex",gap:8,justifyContent:"center"}},
+          !allDrafted?h("button",{style:{background:PRIMARY,color:"#fff",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:14,cursor:"pointer"},onClick:draftNextPick},"Draft Pick #"+(picksMade+1)):null,
+          !allDrafted?h("button",{style:{background:"#21262d",color:"#8b949e",border:"1px solid #30363d",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:14,cursor:"pointer"},onClick:autoDraftAll},"Auto-Draft All"):null,
+          allDrafted?h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:function(){var n=DC(state);n.draftPhase="summary";sync(n)}},"View Draft Summary \u2192"):null
+        ),
+        // On the clock
+        !allDrafted&&nextTeam?h("div",{style:{background:"linear-gradient(135deg,#1c2128,#2d1f00)",border:"2px solid #FFD700",borderRadius:12,padding:20,marginBottom:16,textAlign:"center"}},
+          h("div",{style:{fontSize:12,color:"#FFD700",fontWeight:700,textTransform:"uppercase",letterSpacing:2,marginBottom:8}},"On The Clock"),
+          h("div",{style:{fontSize:28}},teamEmoji(nextTeam)),
+          h("div",{style:{fontSize:18,fontWeight:800,color:"#e6edf3",marginTop:4}},nextTeam),
+          h("div",{style:{fontSize:13,color:"#8b949e",marginTop:4}},"Pick #"+(picksMade+1)),
+          nextProspect?h("div",{style:{marginTop:8,fontSize:12,color:"#6e7681"}},"Projected: "+nextProspect.name+" ("+nextProspect.pos+", "+nextProspect.ovr+" OVR)"):null
+        ):null,
+        // Show drafted picks in reverse (most recent first)
+        picks.slice().reverse().map(function(p){
+          var cardClass="draft-pick-card draft-reveal";
+          if(p.pick<=5)cardClass=cardClass+" top5";
+          else if(p.pick<=15)cardClass=cardClass+" top15";
+          return h("div",{key:p.pick,className:cardClass},
+            h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+              h("div",{style:{background:p.pick<=5?"#FFD700":p.pick<=15?"#C0C0C0":"#30363d",color:p.pick<=15?"#000":"#e6edf3",fontWeight:900,fontSize:20,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},p.pick),
+              avatar((p.player||{}).name||"?",p.teamColor,36),
+              h("div",{style:{flex:1}},
+                h("div",{style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+                  h("span",{style:{fontSize:11,color:"#8b949e"}},teamEmoji(p.team)),
+                  h("span",{style:{fontWeight:600,color:"#8b949e",fontSize:12}},p.team)
+                ),
+                h("div",{style:{fontWeight:800,color:"#e6edf3",fontSize:17,marginTop:2}},(p.player||{}).name||"?"),
+                h("div",{style:{display:"flex",alignItems:"center",gap:6,marginTop:2}},
+                  oB((p.player||{}).ovr||0),
+                  h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | "+htStr((p.player||{}).ht||75)+" | Age "+((p.player||{}).age||20)),
+                  (p.player||{}).college?h("span",{style:{fontSize:11,color:"#6e7681"}},(p.player||{}).college):null
+                )
+              )
+            ),
+            (p.player||{}).info?h("div",{className:"scout-report",style:{marginTop:8}},(p.player||{}).info):null
+          );
+        })
+      );
+    }
+
+    // Summary phase
+    if(dp==="summary"){
+      return h("div",{className:"card fade-in"},
+        h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+          h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"DRAFT RECAP"),
+          h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum+" | "+picks.length+" Picks")
+        ),
+        h("div",{style:{textAlign:"center",marginBottom:20}},
+          h("button",{style:{background:"#FFD700",color:"#0d1117",border:"none",borderRadius:8,padding:"14px 32px",fontWeight:700,fontSize:16,cursor:"pointer"},onClick:finishDraft},"Start New Season \u2192")
+        ),
+        // Full draft recap
+        picks.map(function(p){
+          var cardClass="draft-pick-card";
+          if(p.pick<=5)cardClass=cardClass+" top5";
+          else if(p.pick<=15)cardClass=cardClass+" top15";
+          return h("div",{key:p.pick,className:cardClass},
+            h("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+              h("div",{style:{background:p.pick<=5?"#FFD700":p.pick<=15?"#C0C0C0":"#30363d",color:p.pick<=15?"#000":"#e6edf3",fontWeight:900,fontSize:20,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},p.pick),
+              avatar((p.player||{}).name||"?",p.teamColor,36),
+              h("div",{style:{flex:1}},
+                h("div",{style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+                  h("span",{style:{fontSize:11,color:"#8b949e"}},teamEmoji(p.team)),
+                  h("span",{style:{fontWeight:600,color:"#8b949e",fontSize:12}},p.team)
+                ),
+                h("div",{style:{fontWeight:800,color:"#e6edf3",fontSize:17,marginTop:2}},(p.player||{}).name||"?"),
+                h("div",{style:{display:"flex",alignItems:"center",gap:6,marginTop:2}},
+                  oB((p.player||{}).ovr||0),
+                  h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | "+htStr((p.player||{}).ht||75)+" | Age "+((p.player||{}).age||20)),
+                  (p.player||{}).college?h("span",{style:{fontSize:11,color:"#6e7681"}},(p.player||{}).college):null
+                )
+              )
+            ),
+            (p.player||{}).info?h("div",{className:"scout-report",style:{marginTop:8}},(p.player||{}).info):null
+          );
+        }),
+        vDraftHistory()
+      );
+    }
+
+    // Fallback: show last draft if phase is not draft
+    var d2=state.lastDraft;
     return h("div",{className:"card fade-in"},
-      h("h2",{style:{marginBottom:16,color:ACCENT}},"\uD83C\uDFC0 Draft - Season "+state.seasonNum),
-      r2&&(r2||[]).length>0?h("div",{style:{marginBottom:20}},
-        h("h3",{style:{marginBottom:8,color:"#f85149",fontSize:14}},"\uD83D\uDC4B Retired ("+(r2||[]).length+")"),
-        (r2||[]).map(function(p,i){
-          return h("div",{key:(p.name||"")+i,style:{padding:"8px 12px",background:"#1c2128",borderRadius:6,marginBottom:3,fontSize:12,display:"flex",alignItems:"center",gap:6,border:"1px solid #30363d",color:"#e6edf3"}},
-            avatar(p.name,p.teamColor,24),
-            h("span",{style:{fontWeight:600}},p.name),oB(p.ovr),
-            h("span",{style:{color:"#8b949e"}},p.pos+" | Age "+p.age+" | "+p.team),
-            (p.peakOvr||0)>=85?h("span",{style:{background:"#FFD700",color:"#000",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,marginLeft:4}},"HOF"):null
-          );
-        })
-      ):null,
-      d?h("div",null,h("h3",{style:{marginBottom:8,fontSize:14,color:"#e6edf3"}},"Draft Picks"),
-        (d.picks||[]).map(function(p){
-          return h("div",{key:p.pick,style:{padding:"12px 16px",background:p.pick===1?"linear-gradient(135deg,#2d1f00,#1c2128)":p.pick%2===0?"#1c2128":"#0d1117",borderRadius:10,marginBottom:6,border:p.pick===1?"2px solid #FFD700":"1px solid #30363d"}},
-            h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-              h("span",{style:{fontWeight:800,color:"#FFD700",fontSize:16,minWidth:30}},"#"+p.pick),
-              avatar((p.player||{}).name||"?",p.teamColor,32),
-              h("span",{style:{fontWeight:600,color:"#e6edf3"}},p.team),
-              h("span",{style:{fontWeight:700,color:"#e6edf3"}},(p.player||{}).name||"?"),
-              oB((p.player||{}).ovr||0),
-              h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | "+htStr((p.player||{}).ht||75)+" | Age "+((p.player||{}).age||20)),
-              (p.player||{}).info?h("div",{className:"scout-report",style:{marginTop:6,width:"100%"}},(p.player||{}).info):null
+      h("div",{style:{background:"linear-gradient(135deg,#0d1117,"+PRIMARY+")",borderRadius:12,padding:"30px 20px",textAlign:"center",marginBottom:20}},
+        h("div",{style:{fontSize:36,fontWeight:900,color:"#FFD700",letterSpacing:2}},"MDBA DRAFT"),
+        h("div",{style:{fontSize:16,color:"#fff",opacity:0.8,marginTop:4}},"Season "+state.seasonNum)
+      ),
+      d2?h("div",null,(d2.picks||[]).map(function(p){
+        return h("div",{key:p.pick,className:"draft-pick-card"+(p.pick<=5?" top5":p.pick<=15?" top15":"")},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+            h("span",{style:{fontWeight:800,color:p.pick<=5?"#FFD700":p.pick<=15?"#C0C0C0":"#8b949e",fontSize:18,minWidth:36}},"#"+p.pick),
+            avatar((p.player||{}).name||"?",p.teamColor,32),
+            h("span",{style:{fontWeight:600,color:"#e6edf3"}},teamEmoji(p.team)+" "+p.team),
+            h("span",{style:{fontWeight:700,color:"#e6edf3",fontSize:15}},(p.player||{}).name||"?"),
+            oB((p.player||{}).ovr||0),
+            h("span",{style:{fontSize:11,color:"#8b949e"}},((p.player||{}).pos||"")+" | Age "+((p.player||{}).age||20)),
+            (p.player||{}).info?h("div",{className:"scout-report",style:{marginTop:6,width:"100%"}},(p.player||{}).info):null
+          )
+        );
+      })):h("p",{style:{color:"#8b949e"}},"Complete a season first."),
+      vDraftHistory()
+    );
+  }
+
+  // Draft History section
+  function vDraftHistory(){
+    var dh=(state.draftHistory||[]);
+    if(dh.length===0)return null;
+    return h("div",{style:{marginTop:24}},
+      h("h3",{style:{marginBottom:12,color:ACCENT,fontSize:16}},"Draft History"),
+      dh.slice().reverse().map(function(entry,idx){
+        var entryKey="dh"+(entry.seasonNum||idx);
+        var topPick=(entry.picks||[])[0];
+        // Check if #1 pick is still in the league
+        var topPickCurrent=null;
+        if(topPick){
+          (state.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){
+            if(p.name===topPick.player.name){topPickCurrent={ovr:p.ovr,team:t.name,gp:p.stats.gp,ppg:p.stats.gp>0?(p.stats.pts/p.stats.gp).toFixed(1):"0.0"}}
+          })});
+        }
+        return h("div",{key:entryKey,style:{marginBottom:8}},
+          h("div",{style:{padding:"10px 14px",background:"#1c2128",borderRadius:8,border:"1px solid #30363d",cursor:"pointer"},onClick:function(){var n=DC(state);if(!n._expandedDraft)n._expandedDraft={};n._expandedDraft[entry.seasonNum]=!((n._expandedDraft||{})[entry.seasonNum]);sync(n)}},
+            h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}},
+              h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+                h("span",{style:{fontWeight:800,color:ACCENT}},"Season "+entry.seasonNum+" Draft"),
+                h("span",{style:{fontSize:12,color:"#8b949e"}},(entry.picks||[]).length+" picks")
+              ),
+              topPick?h("div",{style:{display:"flex",alignItems:"center",gap:6}},
+                h("span",{style:{fontSize:11,color:"#FFD700",fontWeight:700}},"#1: "+(topPick.player||{}).name),
+                oB((topPick.player||{}).ovr||0),
+                topPickCurrent?h("span",{style:{fontSize:11,color:"#3fb950"}},"Now: "+topPickCurrent.ovr+" OVR, "+topPickCurrent.ppg+" PPG ("+topPickCurrent.team.split(" ").pop()+")"):h("span",{style:{fontSize:11,color:"#f85149"}},"No longer in league")
+              ):null,
+              h("span",{style:{fontSize:11,color:"#6e7681"}},((state._expandedDraft||{})[entry.seasonNum])?"[collapse]":"[expand]")
             )
-          );
-        })
-      ):h("p",{style:{color:"#8b949e"}},"Complete a season first.")
+          ),
+          ((state._expandedDraft||{})[entry.seasonNum])?h("div",{style:{marginTop:4}},
+            (entry.picks||[]).map(function(p2){
+              var currentPlayer=null;
+              (state.teams||[]).forEach(function(t){(t.players||[]).forEach(function(pl){
+                if(pl.name===(p2.player||{}).name){currentPlayer={ovr:pl.ovr,team:t.name,gp:pl.stats.gp,ppg:pl.stats.gp>0?(pl.stats.pts/pl.stats.gp).toFixed(1):"0.0"}}
+              })});
+              return h("div",{key:p2.pick,style:{padding:"6px 12px",background:p2.pick%2===0?"#0d1117":"#161b22",borderRadius:4,marginBottom:2,fontSize:12,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+                h("span",{style:{fontWeight:700,color:p2.pick<=5?"#FFD700":p2.pick<=15?"#C0C0C0":"#8b949e",minWidth:28}},"#"+p2.pick),
+                h("span",{style:{color:"#e6edf3",fontWeight:600}},(p2.player||{}).name),
+                oB((p2.player||{}).ovr||0),
+                h("span",{style:{color:"#8b949e"}},(p2.player||{}).pos+" | "+p2.team.split(" ").pop()),
+                currentPlayer?h("span",{style:{color:"#3fb950",fontWeight:600}}," \u2192 "+currentPlayer.ovr+" OVR, "+currentPlayer.ppg+" PPG"):h("span",{style:{color:"#6e7681"}}," (out of league)")
+              );
+            }),
+            (entry.cuts||[]).length>0?h("div",{style:{marginTop:6}},
+              h("div",{style:{fontSize:11,color:"#8b949e",fontWeight:700,marginBottom:4}},"Roster Moves"),
+              (entry.cuts||[]).slice(0,10).map(function(c,ci){
+                return h("div",{key:"c"+ci,style:{padding:"3px 12px",fontSize:11,color:c.reason==="waived"?"#da3633":"#8b949e"}},
+                  c.name+" ("+c.pos+", "+c.ovr+" OVR) - "+(c.team||"")+" - "+(c.reason==="waived"?"WAIVED":"RETIRED")
+                );
+              })
+            ):null
+          ):null
+        );
+      })
     );
   }
 
@@ -1831,7 +2312,7 @@ function App(){
           h("input",{type:"file",accept:"image/*",style:{display:"none"},onChange:function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(ev){setLeagueLogo(ev.target.result)};rd.readAsDataURL(f)}})
         ),
         h("div",{style:{fontSize:11,opacity:0.85}},
-          h("div",null,"Season "+(state.seasonNum||1)+" | "+state.phase.toUpperCase()+" | "+played+"/"+(state.schedule||[]).length+" | 30 Teams"),
+          h("div",null,"Season "+(state.seasonNum||1)+" | "+(state.phase==="draft"?(state.draftPhase||"draft").toUpperCase():state.phase.toUpperCase())+" | "+played+"/"+(state.schedule||[]).length+" | 30 Teams"),
           h("div",{style:{display:"flex",alignItems:"center",gap:4,marginTop:2}},
             h("span",{style:{display:"inline-block",width:7,height:7,borderRadius:"50%",background:conn?"#3fb950":"#f85149"}}),
             h("span",{style:{fontSize:10,color:"#8b949e"}},conn?"LIVE":"OFFLINE")
