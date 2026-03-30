@@ -120,6 +120,7 @@ var SCOUT_SKILLS_PF=["Stretch big who spaces the floor with his shooting","Power
 var SCOUT_SKILLS_C=["Dominant post scorer with a variety of moves","Elite rim protector who anchors the defense","Skilled passing big who runs the offense from the elbow","Rebounding machine who controls the glass on both ends"];
 var SCOUT_COMPS=["Draws comparisons to a young LeBron James","Reminiscent of prime Kevin Durant","Has shades of Steph Curry in his game","Plays with Giannis-like intensity","Style reminds scouts of Chris Paul","Moves like a young Kobe Bryant","Has Tim Duncan-like fundamentals","Explosive like young Russell Westbrook","Smooth like Kawhi Leonard","Crafty like Luka Doncic"];
 var SCOUT_CONCERNS=["Needs to add muscle to handle the physicality of the pros","Free throw shooting is a major concern at this stage","Defensive effort comes and goes and needs to be more consistent","Injury history raises durability questions going forward","Shot selection can be questionable at times","Lateral quickness is a limitation on the defensive end","Struggles against length and size at the rim","Ball security needs improvement as turnover numbers are high"];
+var HOBBIES=["Basketball training","Video games","Fishing","Golf","Music production","Fashion design","Cooking","Traveling","Photography","Reading","Yoga","Boxing","Swimming","Skateboarding","Art/Painting","Poker","Chess","Hiking","Surfing","Volunteering","Streaming","Podcasting","Dog training","Car customization","Sneaker collecting","Wine tasting","DJing","Martial arts"];
 function makePlayer(name,pos,age,ovr,ht2,wt2,info){
   var c=genContract(ovr,age);
   var pot=age<=22?ovr+R(5,15):age<=25?ovr+R(2,8):age<=28?ovr+R(0,3):ovr+R(-2,0);
@@ -128,7 +129,8 @@ function makePlayer(name,pos,age,ovr,ht2,wt2,info){
   var hVal=ht2||R(HT[pos][0],HT[pos][1]);
   var wingspan=hVal+R(1,6);
   var nickname=pick(NICKNAMES);
-  return{name:name,pos:pos,age:age,ovr:ovr,potential:pot,prevOvr:ovr,ovrHistory:[ovr],ht:hVal,wt:wt2||R(WT[pos][0],WT[pos][1]),strengths:[pick(STRENGTHS[pos]||STRENGTHS.SF),pick(STRENGTHS[pos]||STRENGTHS.SF)].concat(ovr>=85?[pick(STRENGTHS[pos]||STRENGTHS.SF)]:[]),weakness:pick(WEAKNESSES),info:info||"",stats:emptyStats(),injury:null,salary:c.salary,contractYrs:c.years,college:pick(COLLEGES),birthplace:pick(CITIES),sponsor:pick(SPONSORS),favFood:pick(FOODS),funFact:pick(FUN_FACTS),car:pick(CARS),shoeBrand:pick(SHOE_BRANDS),nickname:nickname,jerseyNumber:jersey,wingspan:wingspan,personality:pick(PERSONALITIES),morale:R(60,100),tradeDemand:false}
+  var hobs=[];var hUsed={};var hCount=R(2,3);for(var hi=0;hi<hCount;hi++){var hb=pick(HOBBIES);if(!hUsed[hb]){hobs.push(hb);hUsed[hb]=true}else{hi--}}
+  return{name:name,pos:pos,age:age,ovr:ovr,potential:pot,prevOvr:ovr,ovrHistory:[ovr],ht:hVal,wt:wt2||R(WT[pos][0],WT[pos][1]),strengths:[pick(STRENGTHS[pos]||STRENGTHS.SF),pick(STRENGTHS[pos]||STRENGTHS.SF)].concat(ovr>=85?[pick(STRENGTHS[pos]||STRENGTHS.SF)]:[]),weakness:pick(WEAKNESSES),info:info||"",stats:emptyStats(),injury:null,salary:c.salary,contractYrs:c.years,college:pick(COLLEGES),birthplace:pick(CITIES),sponsor:pick(SPONSORS),favFood:pick(FOODS),funFact:pick(FUN_FACTS),car:pick(CARS),shoeBrand:pick(SHOE_BRANDS),nickname:nickname,jerseyNumber:jersey,wingspan:wingspan,personality:pick(PERSONALITIES),morale:R(60,100),tradeDemand:false,hobbies:hobs,rookie:false}
 }
 
 // Team meta for all 30 teams
@@ -475,7 +477,9 @@ function runDraft(teams,nr,storedProspects){
   order.forEach(function(tm,pi){
     if(!avail.length)return;
     var ch=avail.shift();
-    tm.players.push(makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info));
+    var draftedP=makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info);
+    draftedP.rookie=true;
+    tm.players.push(draftedP);
     tm.players.sort(function(a,b){return b.ovr-a.ovr});
     picks.push({pick:pi+1,team:tm.name,teamColor:COLORS2[tm.name]||"#666",player:ch});
   });
@@ -668,23 +672,39 @@ function fixArrays(v){
   }catch(e){/* fail silently */}
 }
 
-function genScoutReport(pos,ovr){
-  var tier=ovr>=88?SCOUT_TIERS[0]:ovr>=82?SCOUT_TIERS[1]:ovr>=76?SCOUT_TIERS[2]:ovr>=70?SCOUT_TIERS[3]:ovr>=65?SCOUT_TIERS[4]:SCOUT_TIERS[5];
+function genScoutReport(pos,ovr,compText){
+  var tier=ovr>=88?"Generational talent with franchise-altering ceiling":ovr>=83?"Elite two-way prospect with All-Star potential":ovr>=78?"Lottery pick with high upside":ovr>=73?"First round talent with starter potential":ovr>=68?"Second round prospect with role-player ceiling":"Undrafted type who needs significant development";
+  var role=ovr>=88?"Projected franchise player":ovr>=78?"Projected starter":ovr>=70?"Projected rotation player":"Projected bench player";
   var skills;
   if(pos==="PG")skills=SCOUT_SKILLS_PG;else if(pos==="SG")skills=SCOUT_SKILLS_SG;else if(pos==="SF")skills=SCOUT_SKILLS_SF;else if(pos==="PF")skills=SCOUT_SKILLS_PF;else skills=SCOUT_SKILLS_C;
-  return tier+". "+pick(skills)+". "+pick(SCOUT_COMPS)+". "+pick(SCOUT_CONCERNS)+".";
+  var report=tier+". "+pick(skills)+". "+role+".";
+  if(compText){report=report+" "+compText+"."}else{report=report+" "+pick(SCOUT_COMPS)+"."}
+  report=report+" "+pick(SCOUT_CONCERNS)+".";
+  return report;
 }
 
 function generateProspects(teams){
   var used=new Set();
-  (teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){used.add(p.name)})});
+  var allPlayers=[];
+  (teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){used.add(p.name);allPlayers.push({name:p.name,pos:p.pos,ovr:p.ovr,team:t.name})})});
   var pros=[];
   for(var i=0;i<24;i++){
     var pos=pick(["PG","SG","SF","PF","C"]),age=R(19,22);
     var pct2=1-(i/24),ovr=clamp(Math.round(62+pct2*26+G(0,4)),58,92);
+    // Generational talent is rare: only ~1 in 5 classes, only top prospect
+    if(i===0&&Math.random()<0.2){ovr=clamp(Math.round(88+G(0,3)),88,95)}
+    else{ovr=Math.min(ovr,85)}
     var nm=genName(used);used.add(nm);
-    var report=genScoutReport(pos,ovr);
-    pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:report,college:pick(COLLEGES),draftRank:i+1});
+    // Find a comparison player of same position with similar OVR
+    var compText="";
+    var samePosPlayers=allPlayers.filter(function(cp){return cp.pos===pos});
+    if(samePosPlayers.length>0){
+      samePosPlayers.sort(function(a,b){return Math.abs(a.ovr-ovr)-Math.abs(b.ovr-ovr)});
+      var compP=samePosPlayers[R(0,Math.min(2,samePosPlayers.length-1))];
+      compText="Draws comparisons to "+compP.name+" ("+compP.team+")";
+    }
+    var report=genScoutReport(pos,ovr,compText);
+    pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:report,college:pick(COLLEGES),draftRank:i+1,comparison:compText});
   }
   pros.sort(function(a,b){return b.ovr-a.ovr});
   pros.forEach(function(p,i){p.draftRank=i+1});
@@ -934,6 +954,7 @@ function App(){
         t.hotSeat=false;
       }
     });
+    n.teams.forEach(function(t){t.players.forEach(function(p){p.rookie=false})});
     var draft=runDraft(n.teams,ret.length,n.upcomingProspects);
     var fa=(draft.undrafted||[]).map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
     // Free agent signing / luxury tax logic
@@ -977,26 +998,65 @@ function App(){
   function tHead(c){return h("thead",null,h("tr",null,c.map(function(x){return h("th",{key:x},x)})))}
   function medal(i){return i===0?"\uD83E\uDD47":i===1?"\uD83E\uDD48":"\uD83E\uDD49"}
   function avatar(n,c,s){var sz=s||36;var hash=0;for(var ci=0;ci<(n||"").length;ci++){hash=((hash<<5)-hash)+(n||"").charCodeAt(ci);hash|=0}
+    var ah=Math.abs(hash);
     var skins=["#8D5524","#C68642","#E0AC69","#F1C27D","#FFDBAC","#D2946B"];
-    var skin=skins[Math.abs(hash)%skins.length];
-    var eyeY=sz*0.38,eyeSpread=sz*0.14,eyeR=sz*0.04;
-    var browY=eyeY-sz*0.06,browLen=sz*0.08;
-    var mouthY=sz*0.58,mouthW=sz*0.16;
-    var mouthCurve=Math.abs(hash%3)===0?2:Math.abs(hash%3)===1?0:-1;
-    var mouthPath="M "+(sz/2-mouthW/2)+" "+mouthY+" Q "+(sz/2)+" "+(mouthY+mouthCurve*sz*0.06)+" "+(sz/2+mouthW/2)+" "+mouthY;
+    var skin=skins[ah%skins.length];
+    var hairColors=["#1a1a1a","#2c1810","#4a3728","#1a1a1a","#2c1810","#1a1a1a"];
+    var hairColor=hairColors[ah%hairColors.length];
+    var cx=sz/2,eyeY=sz*0.40,eyeSpread=sz*0.15,eyeR=sz*0.05,pupilR=sz*0.025;
+    var browY=eyeY-sz*0.08,browLen=sz*0.10;
+    var browAngle=(ah%5)-2;
+    var noseY=sz*0.50,noseH=sz*0.06;
+    var mouthY=sz*0.62,mouthW=sz*0.18;
+    var mouthType=ah%3;
+    var mouthCurve=mouthType===0?3:mouthType===1?0:-2;
+    var mouthPath="M "+(cx-mouthW/2)+" "+mouthY+" Q "+cx+" "+(mouthY+mouthCurve*sz*0.04)+" "+(cx+mouthW/2)+" "+mouthY;
+    var hairStyle=ah%6;
+    var hairEls=[];
+    if(hairStyle===0){
+      // Short flat top
+      hairEls.push(h("rect",{key:"h0",x:cx-sz*0.30,y:sz*0.08,width:sz*0.60,height:sz*0.18,rx:sz*0.04,fill:hairColor}));
+    } else if(hairStyle===1){
+      // Afro / round
+      hairEls.push(h("ellipse",{key:"h1",cx:cx,cy:sz*0.22,rx:sz*0.38,ry:sz*0.24,fill:hairColor}));
+    } else if(hairStyle===2){
+      // Fade / angular
+      hairEls.push(h("polygon",{key:"h2",points:(cx-sz*0.32)+","+sz*0.30+" "+cx+","+sz*0.06+" "+(cx+sz*0.32)+","+sz*0.30,fill:hairColor}));
+    } else if(hairStyle===3){
+      // Buzz / minimal
+      hairEls.push(h("rect",{key:"h3",x:cx-sz*0.28,y:sz*0.12,width:sz*0.56,height:sz*0.12,rx:sz*0.06,fill:hairColor}));
+    } else if(hairStyle===4){
+      // Dreads / lines
+      hairEls.push(h("rect",{key:"h4a",x:cx-sz*0.30,y:sz*0.08,width:sz*0.60,height:sz*0.14,rx:sz*0.03,fill:hairColor}));
+      for(var di=0;di<5;di++){hairEls.push(h("line",{key:"h4b"+di,x1:cx-sz*0.24+di*sz*0.12,y1:sz*0.22,x2:cx-sz*0.28+di*sz*0.12,y2:sz*0.38,stroke:hairColor,strokeWidth:Math.max(1,sz*0.03),strokeLinecap:"round"}))}
+    } else {
+      // Mohawk
+      hairEls.push(h("rect",{key:"h5",x:cx-sz*0.08,y:sz*0.04,width:sz*0.16,height:sz*0.22,rx:sz*0.04,fill:hairColor}));
+    }
+    var facialHair=null;
+    if(ah%4===0){facialHair=h("rect",{x:cx-sz*0.06,y:sz*0.65,width:sz*0.12,height:sz*0.06,rx:sz*0.02,fill:hairColor,opacity:0.6})}
+    var collarH=sz*0.16;
+    var elements=[
+      h("circle",{key:"bg",cx:cx,cy:cx,r:cx,fill:skin}),
+      h("rect",{key:"collar",x:0,y:sz-collarH,width:sz,height:collarH,fill:c||"#666",rx:0}),
+      h("ellipse",{key:"neckline",cx:cx,cy:sz-collarH+sz*0.02,rx:sz*0.12,ry:sz*0.04,fill:skin})
+    ].concat(hairEls).concat([
+      h("ellipse",{key:"el",cx:cx-eyeSpread,cy:eyeY,rx:eyeR,ry:eyeR*0.75,fill:"#fff"}),
+      h("circle",{key:"pl",cx:cx-eyeSpread,cy:eyeY,r:pupilR,fill:"#1a1a1a"}),
+      h("ellipse",{key:"er",cx:cx+eyeSpread,cy:eyeY,rx:eyeR,ry:eyeR*0.75,fill:"#fff"}),
+      h("circle",{key:"pr",cx:cx+eyeSpread,cy:eyeY,r:pupilR,fill:"#1a1a1a"}),
+      h("line",{key:"bl",x1:cx-eyeSpread-browLen/2,y1:browY+browAngle*sz*0.01,x2:cx-eyeSpread+browLen/2,y2:browY-browAngle*sz*0.01,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.04),strokeLinecap:"round"}),
+      h("line",{key:"br",x1:cx+eyeSpread-browLen/2,y1:browY-browAngle*sz*0.01,x2:cx+eyeSpread+browLen/2,y2:browY+browAngle*sz*0.01,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.04),strokeLinecap:"round"}),
+      h("line",{key:"nose",x1:cx,y1:noseY-noseH/2,x2:cx,y2:noseY+noseH/2,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.025),strokeLinecap:"round",opacity:0.5}),
+      h("path",{key:"mouth",d:mouthPath,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.035),fill:"none",strokeLinecap:"round"}),
+      facialHair
+    ]);
     return h("div",{style:{width:sz,height:sz,borderRadius:"50%",border:"2px solid "+(c||"#666"),flexShrink:0,overflow:"hidden",boxShadow:"0 2px 6px rgba(0,0,0,0.3)"}},
-      h("svg",{width:sz,height:sz,viewBox:"0 0 "+sz+" "+sz},
-        h("circle",{cx:sz/2,cy:sz/2,r:sz/2,fill:skin}),
-        h("circle",{cx:sz/2-eyeSpread,cy:eyeY,r:eyeR,fill:"#2c1810"}),
-        h("circle",{cx:sz/2+eyeSpread,cy:eyeY,r:eyeR,fill:"#2c1810"}),
-        h("line",{x1:sz/2-eyeSpread-browLen/2,y1:browY,x2:sz/2-eyeSpread+browLen/2,y2:browY-1,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.04),strokeLinecap:"round"}),
-        h("line",{x1:sz/2+eyeSpread-browLen/2,y1:browY-1,x2:sz/2+eyeSpread+browLen/2,y2:browY,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.04),strokeLinecap:"round"}),
-        h("path",{d:mouthPath,stroke:"#2c1810",strokeWidth:Math.max(1,sz*0.03),fill:"none",strokeLinecap:"round"})
-      )
+      h("svg",{width:sz,height:sz,viewBox:"0 0 "+sz+" "+sz},elements)
     )}
   function pLink(n){return h("span",{className:"plink",onClick:function(e){e.stopPropagation();openPC(n)}},n)}
   function openPC(n){var f=null,t2=null;(state.teams||[]).forEach(function(tm){(tm.players||[]).forEach(function(p){if(p.name===n){f=p;t2=tm}})});if(f)setModal({type:"player",p:f,t:t2})}
-  function injTag(p){var tags=[];if(p.injury&&p.injury.games>0)tags.push(h("span",{className:"inj",key:"inj"},p.injury.type.toUpperCase()+" ("+p.injury.games+"G)"));if(p.tradeDemand)tags.push(h("span",{className:"trade-demand",key:"td"},"TRADE DEMAND"));return tags.length>0?h("span",null,tags):null}
+  function injTag(p){var tags=[];if(p.rookie)tags.push(h("span",{key:"rk",style:{background:"#238636",color:"#fff",fontSize:9,padding:"1px 5px",borderRadius:4,fontWeight:700,marginLeft:4}},"ROOKIE"));if(p.injury&&p.injury.games>0)tags.push(h("span",{className:"inj",key:"inj"},p.injury.type.toUpperCase()+" ("+p.injury.games+"G)"));if(p.tradeDemand)tags.push(h("span",{className:"trade-demand",key:"td"},"TRADE DEMAND"));return tags.length>0?h("span",null,tags):null}
   function teamEmoji(name){var m=TEAM_META[name];return m?m.emoji:"\uD83C\uDFC0"}
   function confBadge(conf){return h("span",{className:"conf-badge",style:{background:conf==="EAST"?"#1f6feb":"#da3633",color:"#fff"}},conf)}
   function dynastyBadge(name){var cnt=(state.champCounts||{})[name]||0;if(cnt>=3)return h("span",{className:"dynasty-badge"},"DYNASTY "+cnt+"x");return null}
@@ -1060,6 +1120,11 @@ function App(){
           h("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},(p.strengths||[]).map(function(s2,i){return h("span",{key:i,className:"str-pill"},s2)})),
           p.weakness?h("div",{style:{marginTop:6}},h("span",{style:{background:"#3d1f20",color:"#f85149",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}},"\u26A0 "+p.weakness)):null
         ),
+        // Hobbies
+        (p.hobbies&&p.hobbies.length>0)?h("div",{style:{marginBottom:12}},
+          h("div",{style:{fontSize:11,color:"#8b949e",marginBottom:4}},"HOBBIES"),
+          h("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}},(p.hobbies||[]).map(function(hb,i){return h("span",{key:i,style:{background:"#1a3a5c",color:"#58a6ff",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600,display:"inline-block",margin:"1px"}},hb)}))
+        ):null,
         p.info?h("div",{style:{padding:10,background:"#1c2128",borderRadius:8,fontSize:12,fontStyle:"italic",marginBottom:12,color:"#8b949e",border:"1px solid #30363d"}},'"'+p.info+'"'):null,
         p.injury&&p.injury.games>0?h("div",{style:{padding:10,background:"#3d1f20",borderRadius:8,marginBottom:12,fontSize:12,color:"#f85149"}},"\uD83C\uDFE5 "+p.injury.type+" ("+p.injury.games+" games)"):null,
         gp>0?h("div",null,h("div",{style:{fontSize:11,color:"#8b949e",marginBottom:6}},"SEASON AVERAGES ("+gp+" GP)"),h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}},[{l:"PPG",v:avg(p.stats.pts,gp)},{l:"RPG",v:avg(p.stats.reb,gp)},{l:"APG",v:avg(p.stats.ast,gp)},{l:"SPG",v:avg(p.stats.stl,gp)},{l:"BPG",v:avg(p.stats.blk,gp)},{l:"FG%",v:pct(p.stats.fgm,p.stats.fga)},{l:"3P%",v:pct(p.stats.tpm,p.stats.tpa)},{l:"MPG",v:avg(p.stats.min,gp)},{l:"TO",v:avg(p.stats.to,gp)},{l:"FT%",v:pct(p.stats.ftm,p.stats.fta)},{l:"OREB",v:avg(p.stats.oreb,gp)},{l:"DREB",v:avg(p.stats.dreb,gp)}].map(function(s2){return h("div",{key:s2.l,style:{textAlign:"center",padding:8,background:"#1c2128",borderRadius:8,border:"1px solid #30363d"}},h("div",{style:{fontSize:16,fontWeight:700,color:"#e6edf3"}},s2.v),h("div",{style:{fontSize:9,color:"#8b949e"}},s2.l))}))):null
