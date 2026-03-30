@@ -45,18 +45,15 @@ button{cursor:pointer;font-family:inherit}
 </head>
 <body>
 <div id="root"></div>
+<div id="errbox" style="display:none;background:#fff;color:red;padding:30px;font-family:monospace;border-radius:8px;margin:20px"></div>
 <script>
-var mdbaErrors=[];
 window.onerror=function(msg,url,line,col,err){
   if(msg==="Script error."&&line===0)return true;
-  mdbaErrors.push(msg+" (L"+line+":"+col+") "+(err?err.stack:""));
-  document.getElementById("root").innerHTML="<div style='background:#fff;color:red;padding:30px;font-family:monospace;border-radius:8px;margin:20px'><h2>MDBA Error</h2><pre>"+mdbaErrors.join("\\n\\n")+"</pre><button onclick=location.reload()>Reload</button></div>";
+  var box=document.getElementById("errbox");
+  box.style.display="block";
+  box.innerHTML="<h2>MDBA Error</h2><pre>"+msg+" (L"+line+")\n"+(err?err.stack:"")+"</pre>";
   return true;
 };
-window.addEventListener("unhandledrejection",function(e){
-  mdbaErrors.push("Promise: "+(e.reason?e.reason.message||e.reason:"unknown"));
-  document.getElementById("root").innerHTML="<div style='background:#fff;color:red;padding:30px;font-family:monospace;border-radius:8px;margin:20px'><h2>MDBA Error</h2><pre>"+mdbaErrors.join("\\n\\n")+"</pre><button onclick=location.reload()>Reload</button></div>";
-});
 </script>
 <script>
 // Verify libraries loaded
@@ -1762,22 +1759,7 @@ function App(){
     content()
   );
 }
-// Error boundary to catch and display crashes
-var ErrorBoundary=function(props){return props.children};
-try{
-  var EB=function(){};
-  EB.prototype=Object.create(React.Component.prototype);
-  EB.prototype.constructor=EB;
-  EB.prototype.componentDidCatch=function(error){
-    this.setState({error:error});
-    document.getElementById("root").innerHTML="<div style='color:red;padding:40px;font-family:monospace;background:#fff'><h2>MDBA Crash Report</h2><pre>"+error.message+"\\n\\n"+error.stack+"</pre><button onclick='location.reload()'>Reload</button></div>";
-  };
-  EB.prototype.render=function(){return this.props.children};
-  EB.getDerivedStateFromError=function(error){return{error:error}};
-  ReactDOM.createRoot(document.getElementById("root")).render(h(EB,null,h(App)));
-}catch(e){
-  document.getElementById("root").innerHTML="<div style='color:red;padding:40px;font-family:monospace;background:#fff'><h2>MDBA Load Error</h2><pre>"+e.message+"\\n"+e.stack+"</pre></div>";
-}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
 </script>
 </body>
 </html>
