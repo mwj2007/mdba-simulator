@@ -764,6 +764,10 @@ function App(){
   var _ps2=_("ovr"),pSortKey=_ps2[0],setPSortKey=_ps2[1];
   var _pd2=_("desc"),pSortDir=_pd2[0],setPSortDir=_pd2[1];
   var _logo=_(null),leagueLogo=_logo[0],setLeagueLogo=_logo[1];
+  var _trA2=_(0),_trA=_trA2[0],setTrA=_trA2[1];
+  var _trB2=_(1),_trB=_trB2[0],setTrB=_trB2[1];
+  var _trPA2=_([]),_trPA=_trPA2[0],setTrPA=_trPA2[1];
+  var _trPB2=_([]),_trPB=_trPB2[0],setTrPB=_trPB2[1];
   var lwid=React.useRef(null);
 
   var initLock=React.useRef(false);
@@ -1006,12 +1010,6 @@ function App(){
     for(var i=0;i<Math.min(5,all.length);i++){top5names[all[i].name]=true}
     return top5names;
   }
-
-  // Trade state
-  var _trA2=_(0),_trA=_trA2[0],setTrA=_trA2[1];
-  var _trB2=_(1),_trB=_trB2[0],setTrB=_trB2[1];
-  var _trPA2=_([]),_trPA=_trPA2[0],setTrPA=_trPA2[1];
-  var _trPB2=_([]),_trPB=_trPB2[0],setTrPB=_trPB2[1];
 
   var todayG=(state.schedule||[]).filter(function(g){return g.day===state.currentDay});
   var allDayDone=todayG.every(function(g){return g.result});
