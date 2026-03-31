@@ -756,18 +756,21 @@ function fixArrays(v){
   try{
     if(v===null||v===undefined)return;
     function fixArr(obj,key){
-      if(obj&&obj[key]===null)obj[key]=[];
+      if(obj&&(obj[key]===null||obj[key]===undefined))obj[key]=[];
       if(obj&&obj[key]&&!Array.isArray(obj[key]))obj[key]=Object.values(obj[key]);
     }
     fixArr(v,"teams");fixArr(v,"schedule");fixArr(v,"history");fixArr(v,"freeAgents");fixArr(v,"fanPosts");
-    fixArr(v,"allRetired");fixArr(v,"headlines");fixArr(v,"allTimeAwards");fixArr(v,"allTimeStatLeaders");fixArr(v,"hallOfFame");
+    fixArr(v,"allRetired");fixArr(v,"headlines");fixArr(v,"allTimeAwards");fixArr(v,"hallOfFame");
+    if(!v.allTimeLeaders||typeof v.allTimeLeaders!=="object")v.allTimeLeaders={};
     fixArr(v,"upcomingProspects");fixArr(v,"draftHistory");fixArr(v,"draftLotteryOrder");fixArr(v,"draftProspects");fixArr(v,"draftPicks");fixArr(v,"draftCuts");fixArr(v,"socialPosts");
     if(!v.records||typeof v.records!=="object")v.records={};
     if(!v.seasonRecords||typeof v.seasonRecords!=="object")v.seasonRecords={};
+    if(!v.champCounts||typeof v.champCounts!=="object")v.champCounts={};
     if(v.teams)(v.teams||[]).forEach(function(t){
       fixArr(t,"players");
       if(t.players)(t.players||[]).forEach(function(p){
         fixArr(p,"strengths");fixArr(p,"ovrHistory");fixArr(p,"careerStats");fixArr(p,"hobbies");
+        if(!p.stats||typeof p.stats!=="object")p.stats=emptyStats();
       });
     });
     if(v.schedule)(v.schedule||[]).forEach(function(g){
@@ -1396,7 +1399,7 @@ function App(){
     var pros=generateProspects(t);
     var usedFA=new Set();t.forEach(function(tm){(tm.players||[]).forEach(function(p){usedFA.add(p.name)})});
     var initFA=[];for(var fai=0;fai<12;fai++){var faPos=pick(["PG","SG","SF","PF","C"]);var faOvr=R(58,72);var faAge=R(22,32);var faNm=genName(usedFA);usedFA.add(faNm);initFA.push(makePlayer(faNm,faPos,faAge,faOvr))}
-    return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:2026,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:initFA,playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{},upcomingProspects:pros,draftHistory:[],draftPhase:null,draftLotteryOrder:[],draftLotteryRevealed:0,draftProspects:[],draftPicks:[],draftPicksMade:0,draftCuts:[],socialPosts:[],allTimeLeaders:{},records:{},seasonRecords:{},focusTeam:0,narrative:""};
+    return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:2026,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:initFA,playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{},upcomingProspects:pros,draftHistory:[],draftPhase:null,draftLotteryOrder:[],draftLotteryRevealed:0,draftProspects:[],draftPicks:[],draftPicksMade:0,draftCuts:[],socialPosts:[],fanPosts:[],allTimeLeaders:{},records:{},seasonRecords:{},focusTeam:0,narrative:""};
   }
   function sync(s2){var w2="w"+Date.now()+Math.random();lwid.current=w2;s2._wid=w2;s2.version=VERSION;setState(s2);gameRef.set(s2)}
 
@@ -1421,7 +1424,7 @@ function App(){
         }
       });
     });
-    checkDrama(n);checkHotSeat(n);if(Math.random()<0.3)generateSocialPosts(n);if(Math.random()<0.4)generateFanPosts(n);
+    checkDrama(n);checkHotSeat(n);if(Math.random()<0.5)generateSocialPosts(n);if(Math.random()<0.6)generateFanPosts(n);
   }
   function checkEnd(n){
     if((n.schedule||[]).every(function(g){return g.result})){
@@ -1430,10 +1433,12 @@ function App(){
       n.headlines.push({type:"po",text:"PLAYOFFS BEGIN! Top 8 from each conference!",icon:"\uD83C\uDFC6"});
     }
   }
-  function simIdx(gi){var n=DC(state);processGame(n,gi);checkEnd(n);sync(n)}
+  function simIdx(gi){var n=DC(state);processGame(n,gi);if(!(n.socialPosts||[]).length)generateSocialPosts(n);if(!(n.fanPosts||[]).length)generateFanPosts(n);checkEnd(n);sync(n)}
   function simDay(){
     var n=DC(state);
-    (n.schedule||[]).filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,(n.schedule||[]).indexOf(g))});
+    var dayGamesSimmed=0;
+    (n.schedule||[]).filter(function(g){return g.day===n.currentDay&&!g.result}).forEach(function(g){processGame(n,(n.schedule||[]).indexOf(g));dayGamesSimmed++});
+    if(dayGamesSimmed>0){if(!(n.socialPosts||[]).length||!(n.socialPosts||[]).some(function(p){return p.day===n.currentDay}))generateSocialPosts(n);if(!(n.fanPosts||[]).length)generateFanPosts(n)}
     var ad=!(n.schedule||[]).some(function(g){return g.day===n.currentDay&&!g.result});
     if(ad){var mx=Math.max.apply(null,(n.schedule||[]).map(function(g){return g.day}));if(n.currentDay<mx)n.currentDay++}
     checkEnd(n);sync(n);
@@ -1542,6 +1547,7 @@ function App(){
       });
       n.done=true;
       n.currentDay=Math.max.apply(null,(n.schedule||[{day:1}]).map(function(g){return g.day}));
+      generateSocialPosts(n);generateFanPosts(n);
       // 2. Playoffs
       n.phase="playoffs";n.playoffs=initPO(n.teams);
       if(!n.allStar)n.allStar=runAllStar(n);
@@ -1601,6 +1607,7 @@ function App(){
       // 6. Undrafted to FA
       var draftedNames={};draftPicks.forEach(function(dp){draftedNames[dp.player.name]=true});
       var undrafted=pros.filter(function(p){return!draftedNames[p.name]});
+      n.lastDraft={picks:draftPicks,undrafted:undrafted};
       var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info,p.hintPot)});
       cutResults.forEach(function(c){if(c.reason==="waived"){fa.push(makePlayer(c.name,c.pos,c.age||25,c.ovr,c.ht,c.wt,"Former "+c.team+" player"))}});
       updateAllTimeLeaders(n);
