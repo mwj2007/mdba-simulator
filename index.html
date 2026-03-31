@@ -371,6 +371,8 @@ function simGame(ht,at,hl){
       var b=PB[p.pos]||PB.SF;
       var min=i<5?RF(30,38):i<7?RF(16,26):i<8?RF(10,18):i<10?RF(0,8):RF(0,4);
       var ms=min/36,f=RF(0.6,1.4);
+      if(p.ovr>=90 && Math.random()<0.02) f = RF(1.6, 2.2);
+      else if(p.ovr>=85 && Math.random()<0.01) f = RF(1.5, 1.9);
       var pw=Math.pow(p.ovr/78,2.2)*f;
       // FIXED: star multiplier capped lower for blocks/steals
       var star=p.ovr>=92?1.8:p.ovr>=87?1.5:p.ovr>=82?1.25:p.ovr>=77?1.1:1.0;
@@ -1595,6 +1597,7 @@ function App(){
     n.schedule=genSchedule(n.teams);n.currentDay=1;n.done=false;
     n.seasonNum=(n.seasonNum||2026)+1;n.freeAgents=fa;
     n.playoffs=null;n.allStar=null;n.phase="season";n.headlines=[];
+    if(!n.records)n.records={};if(!n.seasonRecords)n.seasonRecords={};
     n.upcomingProspects=generateProspects(n.teams);
     // Clean up draft state
     n.draftPhase=null;n.draftLotteryOrder=[];n.draftLotteryRevealed=0;
@@ -3225,6 +3228,200 @@ function App(){
   }
 
   // Hall of Fame standalone view
+  function calculateRedraftScore(player, mode){
+    var p = player;
+    var gp = p.stats ? p.stats.gp : 0;
+    var ppg = gp > 0 ? p.stats.pts / gp : 0;
+    var rpg = gp > 0 ? p.stats.reb / gp : 0;
+    var apg = gp > 0 ? p.stats.ast / gp : 0;
+    var presentValue = p.ovr * 1.0 + (gp > 0 ? ppg * 0.3 + rpg * 0.1 + apg * 0.15 : 0);
+    var futureValue = (p.potential || p.ovr) * 0.8 + (30 - p.age) * 1.5 + (p.age <= 23 ? 10 : p.age <= 26 ? 5 : 0);
+    var contractValue = ((p.contractYrs || 1) <= 2 ? 5 : (p.contractYrs || 1) <= 3 ? 2 : 0) + ((p.salary || 0) < 15000000 ? 3 : 0);
+    var durability = p.injury ? -5 : 2;
+    var starPower = p.ovr >= 90 ? 15 : p.ovr >= 85 ? 8 : p.ovr >= 80 ? 3 : 0;
+    var leadership = p.personality === "Leader" ? 4 : p.personality === "Mentor" ? 3 : p.personality === "Competitor" ? 2 : 0;
+    var posValue = p.pos === "PG" ? 3 : p.pos === "C" ? 2 : p.pos === "SF" ? 2 : 1;
+    var pW = 0.45, fW = 0.55;
+    if (mode === "winnow") { pW = 0.70; fW = 0.30; }
+    else if (mode === "future") { pW = 0.25; fW = 0.75; }
+    return Math.round((presentValue * pW + futureValue * fW + contractValue + durability + starPower + leadership + posValue) * 10) / 10;
+  }
+  function getPotGrade(pot) {
+    if (pot >= 95) return "A+";
+    if (pot >= 90) return "A";
+    if (pot >= 85) return "A-";
+    if (pot >= 80) return "B+";
+    if (pot >= 75) return "B";
+    if (pot >= 70) return "B-";
+    return "C";
+  }
+  function generatePickRationale(pick, player, pickNum) {
+    var gp = player.stats ? player.stats.gp : 0;
+    var ppg = gp > 0 ? (player.stats.pts / gp).toFixed(1) : "0.0";
+    var rpg = gp > 0 ? (player.stats.reb / gp).toFixed(1) : "0.0";
+    var apg = gp > 0 ? (player.stats.ast / gp).toFixed(1) : "0.0";
+    var pot = player.potential || player.ovr;
+    var age = player.age;
+    var ovr = player.ovr;
+    var pos = player.pos;
+    var name = player.name;
+    if (pickNum <= 5) {
+      if (pos === "PG" || pos === "SG") {
+        if (age <= 23) return name + " combines elite scoring (" + ppg + " PPG) with youth (age " + age + ") and a superstar ceiling (" + pot + " POT). He is the kind of player you build a decade around, a franchise-altering guard who can run the show.";
+        return name + " is a proven elite guard averaging " + ppg + " PPG with a " + ovr + " OVR. His prime production and leadership make him a cornerstone for any organization.";
+      }
+      if (pos === "SF" || pos === "PF") {
+        if (age <= 23) return name + " is a " + age + "-year-old " + pos + " with rare two-way potential (" + pot + " POT). His combination of size, skill, and upside makes him the ultimate franchise building block.";
+        return name + " dominates on both ends at " + ovr + " OVR, averaging " + ppg + "/" + rpg + "/" + apg + ". A true alpha who elevates every roster he touches.";
+      }
+      if (age <= 23) return name + " is a generational big man prospect at age " + age + " with a " + pot + " POT ceiling. His rim protection and offensive versatility are unmatched in this class.";
+      return name + " anchors both ends of the floor with " + rpg + " RPG and elite interior presence at " + ovr + " OVR. A franchise center is worth his weight in gold.";
+    }
+    if (pickNum <= 15) {
+      if (pos === "PG") return "Elite floor general with room to grow. " + name + "'s vision (" + apg + " APG) and shot creation make him a top-" + pickNum + " lock.";
+      if (pos === "SG") return "Dangerous scoring guard who can get hot in a hurry. " + name + " is a " + ppg + " PPG scorer with " + (age <= 24 ? "significant upside" : "proven consistency") + ".";
+      if (pos === "SF") return "Elite two-way wing with " + (age <= 24 ? "room to grow" : "proven production") + ". " + name + "'s defensive impact and shot creation make him a top-" + pickNum + " lock.";
+      if (pos === "PF") return "Versatile big who can stretch the floor and protect the rim. " + name + " is a " + ovr + " OVR " + (age <= 24 ? "ascending talent" : "reliable star") + ".";
+      return "Dominant interior presence who controls the paint. " + name + " brings " + rpg + " RPG and elite rim protection.";
+    }
+    if (pos === "PG") return "Reliable starter with court vision and a team-friendly deal.";
+    if (pos === "SG") return "Knockdown shooter with positional versatility and solid defense.";
+    if (pos === "SF") return "Switchable wing who contributes on both ends without needing touches.";
+    if (pos === "PF") return "Physical forward with positional versatility and a team-friendly deal.";
+    return "Dependable big man who does the dirty work and anchors the second unit.";
+  }
+  function vMockDraft() {
+    var mockMode = (sub && sub.t === "mockMode") ? sub.d : "balanced";
+    var allPlayers = [];
+    (state.teams || []).forEach(function(t) {
+      (t.players || []).forEach(function(p) {
+        allPlayers.push({player: p, team: t.name, teamColor: COLORS2[t.name] || "#666"});
+      });
+    });
+    var scored = allPlayers.map(function(entry) {
+      var sc = calculateRedraftScore(entry.player, mockMode);
+      return {player: entry.player, team: entry.team, teamColor: entry.teamColor, score: sc};
+    });
+    scored.sort(function(a, b) { return b.score - a.score; });
+    var bigBoard = scored.slice(0, 30);
+    var standings = (state.teams || []).slice().sort(function(a, b) {
+      var aWP = a.wins / Math.max(a.wins + a.losses, 1);
+      var bWP = b.wins / Math.max(b.wins + b.losses, 1);
+      return aWP - bWP;
+    });
+    var draftOrder = standings.slice(0, 30);
+    var available = scored.slice();
+    var picks = [];
+    var usedNames = {};
+    for (var di = 0; di < draftOrder.length && di < 30; di++) {
+      var selectingTeam = draftOrder[di];
+      var bestAvail = null;
+      for (var ai = 0; ai < available.length; ai++) {
+        if (!usedNames[available[ai].player.name]) {
+          bestAvail = available[ai];
+          usedNames[bestAvail.player.name] = true;
+          break;
+        }
+      }
+      if (bestAvail) {
+        picks.push({pickNum: di + 1, selectingTeam: selectingTeam.name, selectingColor: COLORS2[selectingTeam.name] || "#666", player: bestAvail.player, fromTeam: bestAvail.team, fromColor: bestAvail.teamColor, score: bestAvail.score});
+      }
+    }
+    function top5Summary() {
+      var lines = [];
+      for (var ti = 0; ti < Math.min(5, picks.length); ti++) {
+        var pk = picks[ti];
+        var p = pk.player;
+        var gp = p.stats ? p.stats.gp : 0;
+        var ppg = gp > 0 ? (p.stats.pts / gp).toFixed(1) : "N/A";
+        var pot = p.potential || p.ovr;
+        if (ti === 0) {
+          lines.push("The consensus #1 pick is " + p.name + ", a " + p.age + "-year-old " + p.pos + " with a " + p.ovr + " rating and " + pot + " potential ceiling. " + (p.age <= 23 ? "His youth and elite production make him the clear franchise cornerstone." : "His dominance on both ends makes him the most valuable player available."));
+        } else {
+          lines.push("#" + (ti + 1) + ": " + p.name + " (" + p.pos + ", " + p.age + "yo, " + p.ovr + " OVR" + (gp > 0 ? ", " + ppg + " PPG" : "") + ") - " + (p.age <= 24 ? "Elite upside with a " + pot + " ceiling." : "Proven production and reliability."));
+        }
+      }
+      return lines;
+    }
+    var summary = top5Summary();
+    var modeButtons = [
+      {k: "balanced", l: "Balanced"},
+      {k: "winnow", l: "Win Now"},
+      {k: "future", l: "Build for Future"}
+    ];
+    return h("div", {className: "fade-in"},
+      h("div", {style: {textAlign: "center", marginBottom: 24, padding: "24px 20px", background: "linear-gradient(135deg, #0d1117, #1a1a2e, #16213e)", borderRadius: 16, border: "2px solid #FFD700", boxShadow: "0 0 30px rgba(255,215,0,0.15)"}},
+        h("h1", {style: {fontSize: 28, fontWeight: 900, letterSpacing: 3, background: "linear-gradient(135deg, #FFD700, #FFA500)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 4}}, "STARTUP MOCK DRAFT"),
+        h("div", {style: {fontSize: 14, color: "#8b949e"}}, (state.seasonNum || 2026) + " Season | All 30 Teams")
+      ),
+      h("div", {style: {display: "flex", gap: 6, justifyContent: "center", marginBottom: 20}},
+        modeButtons.map(function(mb) {
+          return h("button", {key: mb.k, className: "pill", style: {background: mockMode === mb.k ? "#FFD700" : "#21262d", color: mockMode === mb.k ? "#0d1117" : "#8b949e", fontWeight: 700}, onClick: function() { setSub({t: "mockMode", d: mb.k}); }}, mb.l);
+        })
+      ),
+      h("div", {className: "card", style: {border: "2px solid #FFD700", background: "linear-gradient(135deg, #1a1500, #161b22)", marginBottom: 20}},
+        h("h3", {style: {color: "#FFD700", marginBottom: 12, fontSize: 16}}, "TOP 5 ANALYSIS"),
+        summary.map(function(line, i) {
+          return h("div", {key: i, style: {padding: "8px 12px", marginBottom: 6, background: i === 0 ? "rgba(255,215,0,0.08)" : "transparent", borderRadius: 8, fontSize: 13, color: i === 0 ? "#FFD700" : "#e6edf3", lineHeight: "1.5", borderLeft: i === 0 ? "3px solid #FFD700" : "none"}}, line);
+        })
+      ),
+      h("div", {className: "card", style: {marginBottom: 20}},
+        h("h3", {style: {color: ACCENT, marginBottom: 12}}, "BIG BOARD - Top 30"),
+        h("div", {style: {overflowX: "auto"}},
+          h("table", null,
+            tHead(["Rank", "Player", "Team", "POS", "Age", "OVR", "POT", "Score", "PPG"]),
+            h("tbody", null,
+              bigBoard.map(function(entry, i) {
+                var p = entry.player;
+                var gp = p.stats ? p.stats.gp : 0;
+                var ppg = gp > 0 ? (p.stats.pts / gp).toFixed(1) : "-";
+                var borderColor = i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "transparent";
+                return h("tr", {key: p.name, style: {borderLeft: "3px solid " + borderColor}},
+                  h("td", {style: {fontWeight: 800, color: i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "#e6edf3"}}, i + 1),
+                  h("td", null, h("span", {style: {display: "inline-flex", alignItems: "center", gap: 6}}, avatar(p.name, entry.teamColor, 28), h("span", {className: "plink", onClick: function() { setModal({type: "player", data: p}); }}, p.name))),
+                  h("td", null, h("span", {style: {display: "flex", alignItems: "center", gap: 4}}, dot(entry.teamColor), h("span", {style: {fontSize: 11}}, entry.team))),
+                  h("td", null, p.pos),
+                  h("td", null, p.age),
+                  h("td", null, oB(p.ovr)),
+                  h("td", null, oB(p.potential || p.ovr)),
+                  h("td", {style: {fontWeight: 700, color: i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "#3fb950"}}, entry.score),
+                  h("td", null, ppg)
+                );
+              })
+            )
+          )
+        )
+      ),
+      h("div", {className: "card"},
+        h("h3", {style: {color: ACCENT, marginBottom: 12}}, "MOCK DRAFT - 30 Picks"),
+        picks.map(function(pk, i) {
+          var p = pk.player;
+          var pot = p.potential || p.ovr;
+          var grade = getPotGrade(pot);
+          var rationale = generatePickRationale(pk, p, pk.pickNum);
+          var cardClass = "draft-pick-card" + (i < 5 ? " top5" : i < 15 ? " top15" : "");
+          return h("div", {key: i, className: cardClass, style: {display: "flex", flexDirection: "column", gap: 8}},
+            h("div", {style: {display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8}},
+              h("div", {style: {display: "flex", alignItems: "center", gap: 10}},
+                h("span", {style: {fontWeight: 900, fontSize: 22, color: i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "#8b949e", minWidth: 36}}, "#" + pk.pickNum),
+                avatar(p.name, pk.selectingColor, 40),
+                h("div", null,
+                  h("div", {style: {fontWeight: 700, fontSize: 15, color: "#e6edf3"}}, p.name),
+                  h("div", {style: {fontSize: 11, color: "#8b949e"}}, pk.selectingTeam + " selects from " + pk.fromTeam)
+                )
+              ),
+              h("div", {style: {display: "flex", gap: 8, alignItems: "center"}},
+                h("span", {style: {fontSize: 12, color: "#8b949e"}}, p.pos + " | Age " + p.age),
+                oB(p.ovr),
+                h("span", {style: {padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 800, background: grade === "A+" ? "#FFD700" : grade === "A" ? "#3fb950" : grade.indexOf("A") === 0 ? "#2ea043" : grade.indexOf("B") === 0 ? "#d4a843" : "#666", color: grade === "A+" ? "#000" : "#fff"}}, grade + " POT")
+              )
+            ),
+            h("div", {style: {fontSize: 12, color: "#8b949e", lineHeight: "1.5", fontStyle: "italic", paddingLeft: 46}}, rationale)
+          );
+        })
+      )
+    );
+  }
   function vHallOfFame(){
     var hof=(state.hallOfFame||[]).slice().reverse();
     return h("div",{className:"card fade-in"},
@@ -3243,11 +3440,11 @@ function App(){
   }
 
   // Layout
-  var tabs=[{k:"dashboard",l:"\uD83C\uDFE0 Dashboard"},{k:"today",l:state.phase==="playoffs"?"\uD83C\uDFC6 Playoffs":"Today"},{k:"schedule",l:"Schedule"},{k:"standings",l:"Standings"},{k:"teams",l:"\uD83C\uDFC0 Teams"},{k:"players",l:"Players"},{k:"leaders",l:"Leaders"},{k:"awards",l:"Awards"},{k:"allstar",l:"\u2B50 All-Star"},{k:"draft",l:"Draft"},{k:"prospects",l:"\uD83C\uDF1F Prospects"},{k:"freeagents",l:"\uD83D\uDD8A FA"},{k:"trades",l:"\uD83D\uDD04 Trades"},{k:"headlines",l:"\uD83D\uDCF0 News"},{k:"social",l:"\uD83D\uDCF1 Social"},{k:"fans",l:"\uD83D\uDDE3 Fans"},{k:"history",l:"History"},{k:"halloffame",l:"\uD83C\uDFDB HOF"},{k:"retired",l:"Retired"}];
+  var tabs=[{k:"dashboard",l:"\uD83C\uDFE0 Dashboard"},{k:"today",l:state.phase==="playoffs"?"\uD83C\uDFC6 Playoffs":"Today"},{k:"schedule",l:"Schedule"},{k:"standings",l:"Standings"},{k:"teams",l:"\uD83C\uDFC0 Teams"},{k:"players",l:"Players"},{k:"leaders",l:"Leaders"},{k:"awards",l:"Awards"},{k:"allstar",l:"\u2B50 All-Star"},{k:"draft",l:"Draft"},{k:"prospects",l:"\uD83C\uDF1F Prospects"},{k:"freeagents",l:"\uD83D\uDD8A FA"},{k:"trades",l:"\uD83D\uDD04 Trades"},{k:"headlines",l:"\uD83D\uDCF0 News"},{k:"social",l:"\uD83D\uDCF1 Social"},{k:"fans",l:"\uD83D\uDDE3 Fans"},{k:"history",l:"History"},{k:"halloffame",l:"\uD83C\uDFDB HOF"},{k:"retired",l:"Retired"},{k:"mockdraft",l:"\uD83C\uDFC8 Mock Draft"}];
   function content(){
     try{
-      if(sub){if(sub.t==="team")return vTeam(sub.d);if(sub.t==="box")return vBox(sub.d)}
-      var v2={dashboard:vDashboard,teams:vTeams,today:vToday,headlines:vHeadlines,standings:vStandings,schedule:vSchedule,leaders:vLeaders,players:vPlayers,awards:vAwards,allstar:vAllStar,draft:vDraft,trades:vTrades,prospects:vProspects,freeagents:vFreeAgents,retired:vRetired,history:vHistory,social:vSocial,fans:vFans,halloffame:vHallOfFame};
+      if(sub){if(sub.t==="team")return vTeam(sub.d);if(sub.t==="box")return vBox(sub.d);if(sub.t==="mockMode")return vMockDraft()}
+      var v2={dashboard:vDashboard,teams:vTeams,today:vToday,headlines:vHeadlines,standings:vStandings,schedule:vSchedule,leaders:vLeaders,players:vPlayers,awards:vAwards,allstar:vAllStar,draft:vDraft,trades:vTrades,prospects:vProspects,freeagents:vFreeAgents,retired:vRetired,history:vHistory,social:vSocial,fans:vFans,halloffame:vHallOfFame,mockdraft:vMockDraft};
       return(v2[view]||vDashboard)();
     }catch(renderErr){
       return h("div",{style:{color:"#ff6b6b",padding:20,background:"#1c2128",borderRadius:8}},
@@ -3287,7 +3484,7 @@ function App(){
         h("button",{style:{background:"#dc3545",color:"#fff",border:"2px solid #ff0000",borderRadius:6,padding:"6px 14px",fontWeight:700,fontSize:13,cursor:"pointer"},onClick:resetAll},"\u26A0\uFE0F RESET")
       )
     ),
-    h("div",{style:{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap",overflowX:"auto"}},tabs.map(function(t){return h("button",{key:t.k,className:"pill",style:{background:view===t.k&&!sub?PRIMARY:"#21262d",color:view===t.k&&!sub?"#fff":"#8b949e"},onClick:function(){setView(t.k);setSub(null)}},t.l)})),
+    h("div",{style:{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap",overflowX:"auto"}},tabs.map(function(t){var isActive=(view===t.k&&!sub)||(t.k==="mockdraft"&&sub&&sub.t==="mockMode");return h("button",{key:t.k,className:"pill",style:{background:isActive?PRIMARY:"#21262d",color:isActive?"#fff":"#8b949e"},onClick:function(){setView(t.k);setSub(null)}},t.l)})),
     content()
   );
 }
