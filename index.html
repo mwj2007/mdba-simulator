@@ -2511,23 +2511,23 @@ function App(){
       (function(){
         var rec=state.records||{};
         var srec=state.seasonRecords||{};
-        var recLabels={pts:"Most Points",reb:"Most Rebounds",ast:"Most Assists",blk:"Most Blocks",stl:"Most Steals",tpm:"Most 3-Pointers"};
-        var srecLabels={ppg:"Highest PPG",rpg:"Highest RPG",apg:"Highest APG",bpg:"Highest BPG",spg:"Highest SPG"};
+        var recLabels={pts:"\uD83C\uDFC0 Most Points",reb:"\uD83D\uDCAA Most Rebounds",ast:"\uD83C\uDFAF Most Assists",blk:"\uD83D\uDEAB Most Blocks",stl:"\uD83D\uDC40 Most Steals",tpm:"\uD83C\uDFAF Most 3-Pointers"};
+        var srecLabels={ppg:"\uD83C\uDFC0 Highest PPG",rpg:"\uD83D\uDCAA Highest RPG",apg:"\uD83C\uDFAF Highest APG",bpg:"\uD83D\uDEAB Highest BPG",spg:"\uD83D\uDC40 Highest SPG"};
         var hasRec=false;var hasSRec=false;
         for(var rk in recLabels){if(rec[rk])hasRec=true}
         for(var sk in srecLabels){if(srec[sk])hasSRec=true}
         if(!hasRec&&!hasSRec)return null;
-        return h("div",{style:{marginBottom:20}},
-          hasRec?h("div",{style:{marginBottom:12}},
-            h("h3",{style:{fontSize:14,color:"#FFD700",marginBottom:8}},"\uD83C\uDFC6 All-Time Single Game Records"),
-            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
-              (function(){var items=[];for(var k in recLabels){if(rec[k]){items.push(h("div",{key:k,style:{padding:"8px 12px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:8,border:"1px solid #FFD700",fontSize:12}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:11}},recLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:600}},rec[k].name+" - "+rec[k].value),h("div",{style:{color:"#8b949e",fontSize:10}},rec[k].team+" ("+rec[k].season+")")))}}return items})()
+        return h("div",{style:{marginBottom:24}},
+          hasRec?h("div",{style:{marginBottom:16}},
+            h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83D\uDD25 All-Time Single Game Records"),
+            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
+              (function(){var items=[];for(var k in recLabels){if(rec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},recLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:20}},rec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},rec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},rec[k].team+" \u2022 "+(rec[k].season||"")+" Season")))}}return items})()
             )
           ):null,
           hasSRec?h("div",null,
-            h("h3",{style:{fontSize:14,color:"#FFD700",marginBottom:8}},"\uD83C\uDFC6 All-Time Season Average Records"),
-            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
-              (function(){var items=[];for(var k in srecLabels){if(srec[k]){items.push(h("div",{key:k,style:{padding:"8px 12px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:8,border:"1px solid #FFD700",fontSize:12}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:11}},srecLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:600}},srec[k].name+" - "+srec[k].value),h("div",{style:{color:"#8b949e",fontSize:10}},srec[k].team+" ("+srec[k].season+")")))}}return items})()
+            h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83C\uDFC6 All-Time Season Average Records"),
+            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
+              (function(){var items=[];for(var k in srecLabels){if(srec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},srecLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:20}},srec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},srec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},srec[k].team+" \u2022 "+(srec[k].season||"")+" Season")))}}return items})()
             )
           ):null
         );
@@ -2563,21 +2563,34 @@ function App(){
         var atl=state.allTimeLeaders||{};
         var ldrArr=[];for(var k in atl){if(atl.hasOwnProperty(k)&&!k.match(/^_/))ldrArr.push(atl[k])}
         if(ldrArr.length===0)return null;
-        var ptsL=ldrArr.slice().sort(function(a,b){return b.pts-a.pts}).slice(0,5);
-        var rebL=ldrArr.slice().sort(function(a,b){return b.reb-a.reb}).slice(0,5);
-        var astL=ldrArr.slice().sort(function(a,b){return b.ast-a.ast}).slice(0,5);
-        function ldrRow(arr,label,statKey){
-          return h("div",{style:{marginBottom:12}},
-            h("div",{style:{fontSize:12,fontWeight:700,color:ACCENT,marginBottom:4}},label),
-            arr.map(function(p,i){return h("div",{key:p.name+i,style:{fontSize:11,color:"#e6edf3",padding:"2px 0"}},(i+1)+". "+p.name+" - "+p[statKey].toLocaleString()+" ("+p.gp+" GP)")})
+        var ptsL=ldrArr.slice().sort(function(a,b){return b.pts-a.pts}).slice(0,10);
+        var rebL=ldrArr.slice().sort(function(a,b){return b.reb-a.reb}).slice(0,10);
+        var astL=ldrArr.slice().sort(function(a,b){return b.ast-a.ast}).slice(0,10);
+        var stlL=ldrArr.slice().sort(function(a,b){return(b.stl||0)-(a.stl||0)}).slice(0,10);
+        var blkL=ldrArr.slice().sort(function(a,b){return(b.blk||0)-(a.blk||0)}).slice(0,10);
+        var gpL=ldrArr.slice().sort(function(a,b){return b.gp-a.gp}).slice(0,10);
+        function ldrRow(arr,label,statKey,emoji){
+          return h("div",{style:{marginBottom:16,padding:12,background:"linear-gradient(135deg,#161b22,#1c2128)",borderRadius:10,border:"1px solid #30363d"}},
+            h("div",{style:{fontSize:13,fontWeight:700,color:"#FFD700",marginBottom:8}},emoji+" "+label),
+            arr.map(function(p,i){
+              var val=p[statKey]||0;
+              var display=val>=1000?val.toLocaleString():val;
+              return h("div",{key:p.name+i,style:{fontSize:12,color:i<3?"#FFD700":"#e6edf3",fontWeight:i<3?700:400,padding:"3px 0",display:"flex",justifyContent:"space-between"}},
+                h("span",null,(i+1)+". "+p.name+(p.retired?" (RET)":"")),
+                h("span",{style:{fontWeight:700}},display+(statKey!=="gp"?" ("+p.gp+" GP)":""))
+              );
+            })
           );
         }
-        return h("div",{style:{marginBottom:20}},
-          h("h3",{style:{fontSize:14,color:ACCENT,marginBottom:8}},"All-Time Career Leaders"),
-          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}},
-            ldrRow(ptsL,"Points","pts"),
-            ldrRow(rebL,"Rebounds","reb"),
-            ldrRow(astL,"Assists","ast")
+        return h("div",{style:{marginBottom:24}},
+          h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83D\uDCCA All-Time Career Totals Leaders"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}},
+            ldrRow(ptsL,"Total Points","pts","\uD83C\uDFC0"),
+            ldrRow(rebL,"Total Rebounds","reb","\uD83D\uDCAA"),
+            ldrRow(astL,"Total Assists","ast","\uD83C\uDFAF"),
+            ldrRow(stlL,"Total Steals","stl","\uD83D\uDC40"),
+            ldrRow(blkL,"Total Blocks","blk","\uD83D\uDEAB"),
+            ldrRow(gpL,"Games Played","gp","\uD83C\uDFDF\uFE0F")
           )
         );
       })(),
