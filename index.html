@@ -369,7 +369,7 @@ function simGame(ht,at,hl){
     var st=[],tot=0;
     pl.forEach(function(p,i){
       var b=PB[p.pos]||PB.SF;
-      var min=i<5?RF(30,38):i<8?RF(16,26):i<11?RF(6,16):RF(0,6);
+      var min=i<5?RF(30,38):i<7?RF(16,26):i<8?RF(10,18):i<10?RF(0,8):RF(0,4);
       var ms=min/36,f=RF(0.6,1.4);
       var pw=Math.pow(p.ovr/78,2.2)*f;
       // FIXED: star multiplier capped lower for blocks/steals
@@ -471,7 +471,7 @@ function ageRetire(teams){
 }
 
 function cutPlayers(teams,draftOrder){
-  var ROSTER_LIMIT=8;
+  var ROSTER_LIMIT=10;
   var cuts=[];
   (teams||[]).forEach(function(t){
     // Count how many draft picks this team has
@@ -938,6 +938,61 @@ function generateLeagueWideTrade(teams){
   return result;
 }
 
+function updateAllTimeLeaders(st){
+  if(!st.allTimeLeaders)st.allTimeLeaders={};
+  var atl=st.allTimeLeaders;
+  // Collect all active players
+  (st.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){
+    var key=p.name;
+    if(!atl[key])atl[key]={name:p.name,pos:p.pos,pts:0,reb:0,ast:0,stl:0,blk:0,gp:0};
+    var ldr=atl[key];
+    // Add current season stats
+    ldr.pts+=p.stats.pts;ldr.reb+=p.stats.reb;ldr.ast+=p.stats.ast;
+    ldr.stl+=p.stats.stl;ldr.blk+=p.stats.blk;ldr.gp+=p.stats.gp;
+    // Add prior career stats if first time
+    if(!ldr._priorAdded&&(p.careerStats||[]).length>0){
+      (p.careerStats||[]).forEach(function(cs){
+        ldr.pts+=Math.round((cs.ppg||0)*(cs.gp||0));
+        ldr.reb+=Math.round((cs.rpg||0)*(cs.gp||0));
+        ldr.ast+=Math.round((cs.apg||0)*(cs.gp||0));
+        ldr.gp+=(cs.gp||0);
+      });
+      ldr._priorAdded=true;
+    }
+  })});
+  // Also include retired players that may not have been tracked yet
+  (st.allRetired||[]).forEach(function(p){
+    var key=p.name;
+    if(!atl[key])atl[key]={name:p.name,pos:p.pos,pts:0,reb:0,ast:0,stl:0,blk:0,gp:0,retired:true};
+  });
+}
+
+function fillRosters(teams){
+  var usedNames=new Set();
+  (teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){usedNames.add(p.name)})});
+  var allPositions=["PG","SG","SF","PF","C"];
+  (teams||[]).forEach(function(t){
+    while((t.players||[]).length<10){
+      // Determine which positions are underrepresented
+      var posCounts={PG:0,SG:0,SF:0,PF:0,C:0};
+      (t.players||[]).forEach(function(p){posCounts[p.pos]=(posCounts[p.pos]||0)+1});
+      var needPos=null;
+      allPositions.forEach(function(pos){if(!needPos&&(posCounts[pos]||0)<2)needPos=pos});
+      if(!needPos)needPos=pick(allPositions);
+      var benchIdx=(t.players||[]).length;
+      var ovr;
+      if(benchIdx<=6)ovr=R(65,72);
+      else if(benchIdx<=8)ovr=R(60,68);
+      else ovr=R(58,65);
+      var age=R(22,30);
+      var nm=genName(usedNames);usedNames.add(nm);
+      var p2=makePlayer(nm,needPos,age,ovr,0,0,"Bench player");
+      t.players.push(p2);
+    }
+    t.players.sort(function(a,b){return b.ovr-a.ovr});
+  });
+}
+
 // React App
 function App(){
   var _=React.useState;
@@ -996,7 +1051,7 @@ function App(){
   },[]);
 
   function buildInit(){
-    var t=initTeams(),s=genSchedule(t);
+    var t=initTeams();fillRosters(t);var s=genSchedule(t);
     var pros=generateProspects(t);
     return{teams:t,schedule:s,currentDay:1,done:false,history:[],seasonNum:2026,lastDraft:null,lastRetired:null,allRetired:[],headlines:[],freeAgents:[],playoffs:null,phase:"season",allStar:null,version:VERSION,allTimeAwards:[],hallOfFame:[],champCounts:{},upcomingProspects:pros,draftHistory:[],draftPhase:null,draftLotteryOrder:[],draftLotteryRevealed:0,draftProspects:[],draftPicks:[],draftPicksMade:0,draftCuts:[],socialPosts:[],allTimeLeaders:{},records:{},seasonRecords:{}};
   }
@@ -1235,7 +1290,12 @@ function App(){
     n.draftPicksMade=0;
     n.draftCuts=cutResults;
     if(!n.allRetired)n.allRetired=[];
-    n.allRetired=(n.allRetired||[]).concat(ret).concat(cutResults.filter(function(c){return c.reason==="retired"}));
+    // Add retired players
+    n.allRetired=(n.allRetired||[]).concat(ret);
+    // Add waived players (they are also out of the league)
+    cutResults.forEach(function(c){
+      n.allRetired.push({name:c.name,pos:c.pos,age:c.age,ovr:c.ovr,ht:c.ht,wt:c.wt,team:c.team,teamColor:c.teamColor,peakOvr:c.peakOvr||c.ovr,reason:c.reason||"waived"});
+    });
     sync(n);setView("draft");setSub(null);
   }
 
@@ -1364,6 +1424,8 @@ function App(){
     });
     // Save lastDraft for compatibility
     n.lastDraft={picks:(n.draftPicks||[]).slice(),undrafted:undrafted};
+    // Update all-time leaders BEFORE resetting stats
+    updateAllTimeLeaders(n);
     // Free agent signing / luxury tax logic
     (n.teams||[]).forEach(function(t){
       t.wins=0;t.losses=0;t.hotSeat=false;
@@ -1382,19 +1444,8 @@ function App(){
       });
       t.capSpace=140000000-(t.players||[]).reduce(function(s,p){return s+p.salary},0);
     });
-    // Update all-time leaders
-    if(!n.allTimeLeaders)n.allTimeLeaders={};
-    (n.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){
-      var key=p.name;
-      if(!n.allTimeLeaders[key])n.allTimeLeaders[key]={name:p.name,pos:p.pos,pts:0,reb:0,ast:0,stl:0,blk:0,gp:0};
-      var ldr=n.allTimeLeaders[key];
-      ldr.pts+=p.stats.pts;ldr.reb+=p.stats.reb;ldr.ast+=p.stats.ast;ldr.stl+=p.stats.stl;ldr.blk+=p.stats.blk;ldr.gp+=p.stats.gp;
-      // Add prior career stats if first time
-      if(!ldr._priorAdded&&(p.careerStats||[]).length>0){
-        (p.careerStats||[]).forEach(function(cs){ldr.pts+=Math.round((cs.ppg||0)*(cs.gp||0));ldr.reb+=Math.round((cs.rpg||0)*(cs.gp||0));ldr.ast+=Math.round((cs.apg||0)*(cs.gp||0));ldr.gp+=(cs.gp||0)});
-        ldr._priorAdded=true;
-      }
-    })});
+    // Fill rosters to 10 players each season
+    fillRosters(n.teams);
     n.schedule=genSchedule(n.teams);n.currentDay=1;n.done=false;
     n.seasonNum=(n.seasonNum||2026)+1;n.freeAgents=fa;
     n.playoffs=null;n.allStar=null;n.phase="season";n.headlines=[];
