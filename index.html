@@ -161,7 +161,7 @@ var SCOUT_CONCERNS=["Needs to add muscle to handle the physicality of the pros",
 var HOBBIES=["Basketball training","Video games","Fishing","Golf","Music production","Fashion design","Cooking","Traveling","Photography","Reading","Yoga","Boxing","Swimming","Skateboarding","Art/Painting","Poker","Chess","Hiking","Surfing","Volunteering","Streaming","Podcasting","Dog training","Car customization","Sneaker collecting","Wine tasting","DJing","Martial arts"];
 var SONGS=["Money Trees - Kendrick Lamar","Sicko Mode - Travis Scott","All The Stars - Kendrick & SZA","Mask Off - Future","No Role Modelz - J. Cole","HUMBLE. - Kendrick","Nice For What - Drake","Praise The Lord - A$AP Rocky","Congratulations - Post Malone","Rockstar - Post Malone","DNA. - Kendrick","XO Tour Llif3 - Lil Uzi","Goosebumps - Travis Scott","Bad and Boujee - Migos","God's Plan - Drake","Mo Bamba - Sheck Wes","Old Town Road - Lil Nas X","Industry Baby - Lil Nas X","Way 2 Sexy - Drake","Essence - Wizkid","Laugh Now Cry Later - Drake","Life Is Good - Future & Drake","Highest In The Room - Travis Scott","Blinding Lights - The Weeknd","Levitating - Dua Lipa","Heat Waves - Glass Animals","As It Was - Harry Styles","Snooze - SZA","Kill Bill - SZA","Rich Flex - Drake & 21","Superhero - Metro Boomin","Creepin - Metro Boomin","Players - Coi Leray","Paint The Town Red - Doja Cat","Water - Tyla","Carnival - Kanye","Not Like Us - Kendrick","Luther - Kendrick & SZA","APT. - Rose & Bruno Mars","Starboy - The Weeknd","STAY - Kid Laroi & Justin Bieber"];
 var ARCHETYPES={PG:["Floor General","Scoring PG","3-and-D Guard","Speed Demon"],SG:["Sharpshooter","Shot Creator","3-and-D Wing","Slasher"],SF:["Point Forward","3-and-D Wing","Slasher","Versatile Scorer"],PF:["Stretch Four","Interior Force","Two-Way Forward","Rim Runner"],C:["Rim Protector","Stretch Five","Post Scorer","Rebounding Machine"]};
-function makePlayer(name,pos,age,ovr,ht2,wt2,info){
+function makePlayer(name,pos,age,ovr,ht2,wt2,info,hintPot){
   var c=genContract(ovr,age);
   var pot;
   var isSpecial=(name==="NILES MCGEE"||name==="ISAIAH CARTER");
@@ -169,7 +169,12 @@ function makePlayer(name,pos,age,ovr,ht2,wt2,info){
   else if(age<=25){pot=ovr+R(1,6)}
   else if(age<=28){pot=ovr+R(0,2)}
   else{pot=Math.max(ovr,ovr+R(-3,0))}
-  pot=Math.min(isSpecial?99:93,Math.max(ovr,pot));
+  var potCap=95;
+  if(isSpecial) potCap=99;
+  else if(ovr>=85&&Math.random()<0.05) potCap=97;
+  else if(ovr>=80&&Math.random()<0.01) potCap=99;
+  pot=Math.min(potCap,Math.max(ovr,pot));
+  if(hintPot&&hintPot>pot) pot=Math.min(99,hintPot);
   var jersey=R(0,55);
   var hVal=ht2||R(HT[pos][0],HT[pos][1]);
   var wingspan=hVal+R(1,6);
@@ -401,7 +406,7 @@ function simGame(ht,at,hl){
       if(p.ovr>=92 && Math.random()<0.05) f = RF(2.2, 3.2);
       else if(p.ovr>=88 && Math.random()<0.03) f = RF(1.8, 2.6);
       else if(p.ovr>=85 && Math.random()<0.02) f = RF(1.5, 2.0);
-      var pw=Math.pow(p.ovr/78,2.2)*f;
+      var pw=Math.pow(p.ovr/78,2.0)*f;
       // FIXED: star multiplier capped lower for blocks/steals
       var star=p.ovr>=92?1.8:p.ovr>=87?1.5:p.ovr>=82?1.25:p.ovr>=77?1.1:1.0;
       var starBlk=Math.min(star,1.8);
@@ -825,7 +830,9 @@ function generateProspects(teams){
   for(var i=0;i<24;i++){
     var pos=pick(["PG","SG","SF","PF","C"]),age=R(19,22);
     var pct2=1-(i/24),ovr=clamp(Math.round(62+pct2*20+G(0,4)),58,76);
-    if(i===0&&isGenerational){ovr=clamp(Math.round(88+G(0,2)),88,92)}
+    if(i===0&&isGenerational){ovr=clamp(Math.round(88+G(0,2)),88,92);pos=pick(["PG","SG","SF","PF","C"]);}
+    var prospPot=0;
+    if(i===0&&isGenerational){prospPot=R(95,99)}
     else if(i===0&&isStrong){ovr=clamp(Math.round(83+G(0,2)),83,87)}
     else if(i===0){ovr=clamp(Math.round(78+G(0,2.5)),78,83)}
     else if(i===1){ovr=Math.min(ovr+R(3,8),isStrong?84:80)}
@@ -840,7 +847,7 @@ function generateProspects(teams){
       compText="Draws comparisons to "+compP.name+" ("+compP.team+")";
     }
     var report=genScoutReport(pos,ovr,compText);
-    pros.push({name:nm,pos:pos,age:age,ovr:ovr,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:report,college:pick(COLLEGES),draftRank:i+1,comparison:compText});
+    pros.push({name:nm,pos:pos,age:age,ovr:ovr,hintPot:prospPot,ht:R(HT[pos][0],HT[pos][1]),wt:R(WT[pos][0],WT[pos][1]),info:report,college:pick(COLLEGES),draftRank:i+1,comparison:compText});
   }
   pros.sort(function(a,b){return b.ovr-a.ovr});
   pros.forEach(function(p,i){p.draftRank=i+1});
@@ -1033,6 +1040,79 @@ function generateLeagueWideTrade(teams){
   var result=generateBlockbusterTrade(a,b,teams);
   if(result){result.teamAIdx=a;result.teamBIdx=b}
   return result;
+}
+
+function suggestTradeForPlayer(playerName,fromTeamIdx,teams){
+  if(!teams||teams.length<2) return null;
+  var fromTeam=teams[fromTeamIdx];
+  if(!fromTeam) return null;
+  var player=null;
+  (fromTeam.players||[]).forEach(function(p){if(p.name===playerName) player=p});
+  if(!player) return null;
+  var bestScore=-999;
+  var bestTeamIdx=-1;
+  for(var ti=0;ti<teams.length;ti++){
+    if(ti===fromTeamIdx) continue;
+    var t=teams[ti];
+    var tp=(t.players||[]);
+    // Position need: does this team lack this position?
+    var posCount=0;
+    tp.forEach(function(p2){if(p2.pos===player.pos) posCount++});
+    var posNeed=posCount<=1?10:posCount<=2?5:0;
+    // Cap space factor
+    var totalSal=tp.reduce(function(s,p2){return s+(p2.salary||0)},0);
+    var capSpace=140000000-totalSal;
+    var capFit=capSpace>=(player.salary||0)?5:capSpace>0?2:-3;
+    // Contending or rebuilding
+    var avgOvr=tp.length>0?tp.reduce(function(s,p2){return s+p2.ovr},0)/tp.length:70;
+    var contending=avgOvr>=78;
+    var rebuilding=avgOvr<73;
+    var fitScore=0;
+    if(contending&&player.ovr>=82) fitScore=8;
+    else if(rebuilding&&player.age<=24) fitScore=7;
+    else if(!contending&&!rebuilding) fitScore=4;
+    // Age fit
+    var teamAvgAge=tp.length>0?tp.reduce(function(s,p2){return s+p2.age},0)/tp.length:25;
+    var ageFit=Math.abs(player.age-teamAvgAge)<4?3:0;
+    var score=posNeed+capFit+fitScore+ageFit+R(0,3);
+    if(score>bestScore){bestScore=score;bestTeamIdx=ti}
+  }
+  if(bestTeamIdx<0) return null;
+  var bestTeam=teams[bestTeamIdx];
+  var bestTP=(bestTeam.players||[]).slice().sort(function(a,b){return b.ovr-a.ovr});
+  // Build return package matching OVR value roughly
+  var targetOvr=player.ovr;
+  var pkg=[];var pkgOvr=0;
+  for(var pi=0;pi<bestTP.length&&pkg.length<2;pi++){
+    var cp=bestTP[pi];
+    if(pkgOvr+cp.ovr<=targetOvr*1.3||pkg.length===0){
+      pkg.push(cp);pkgOvr+=cp.ovr;
+      if(pkgOvr>=targetOvr*0.8&&pkg.length>=1) break;
+    }
+  }
+  if(pkg.length===0) return null;
+  // Rationale
+  var posCount2=0;
+  (bestTeam.players||[]).forEach(function(p2){if(p2.pos===player.pos) posCount2++});
+  var needText=posCount2<=1?"desperately needs a "+player.pos:"could use depth at "+player.pos;
+  var fitText=player.ovr>=85?"a star acquisition that elevates their roster":player.age<=24?"a young piece with upside":"a solid veteran addition";
+  var rationale=bestTeam.name+" "+needText+". "+player.name+" would be "+fitText+". ";
+  var pkgNames=pkg.map(function(p2){return p2.name+" ("+p2.ovr+")"}).join(" + ");
+  rationale=rationale+"Return package of "+pkgNames+" provides fair value.";
+  // Grade
+  var diff=pkgOvr-targetOvr;
+  var gradeFrom=diff>5?"A":diff>0?"A-":diff>-5?"B+":"B";
+  var gradeTo=diff>5?"B":diff>0?"B+":diff>-5?"A-":"A";
+  return{
+    starPlayer:player,starTeam:fromTeam.name,
+    package:pkg,packageTeam:bestTeam.name,
+    starTeamIdx:fromTeamIdx,packageTeamIdx:bestTeamIdx,
+    teamAIdx:fromTeamIdx,teamBIdx:bestTeamIdx,
+    gradeStarTeam:gradeFrom,gradePackageTeam:gradeTo,
+    reasonStarTeam:"Sends "+player.name+" for "+pkgNames+". "+rationale,
+    reasonPackageTeam:bestTeam.name+" gets "+player.name+" to fill a roster need.",
+    rationale:rationale
+  };
 }
 
 function updateAllTimeLeaders(st){
@@ -1512,7 +1592,7 @@ function App(){
       while(pickNum<order.length&&avail.length>0){
         var teamName=order[pickNum];var tm=(n.teams||[]).find(function(t){return t.name===teamName});
         if(!tm){pickNum++;continue}
-        var ch=avail.shift();var draftedP=makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info);
+        var ch=avail.shift();var draftedP=makePlayer(ch.name,ch.pos,ch.age,ch.ovr,ch.ht,ch.wt,ch.info,ch.hintPot);
         draftedP.rookie=true;tm.players.push(draftedP);tm.players.sort(function(a,b){return b.ovr-a.ovr});
         draftPicks.push({pick:pickNum+1,team:teamName,teamColor:COLORS2[teamName]||"#666",player:{name:ch.name,pos:ch.pos,age:ch.age,ovr:ch.ovr}});
         pickNum++;
@@ -1521,7 +1601,7 @@ function App(){
       // 6. Undrafted to FA
       var draftedNames={};draftPicks.forEach(function(dp){draftedNames[dp.player.name]=true});
       var undrafted=pros.filter(function(p){return!draftedNames[p.name]});
-      var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
+      var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info,p.hintPot)});
       cutResults.forEach(function(c){if(c.reason==="waived"){fa.push(makePlayer(c.name,c.pos,c.age||25,c.ovr,c.ht,c.wt,"Former "+c.team+" player"))}});
       updateAllTimeLeaders(n);
       // Reset for new season
@@ -1781,7 +1861,7 @@ function App(){
     var draftedNames={};
     (n.draftPicks||[]).forEach(function(dp){draftedNames[dp.player.name]=true});
     var undrafted=(n.draftProspects||[]).filter(function(p){return!draftedNames[p.name]});
-    var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info)});
+    var fa=undrafted.map(function(p){return makePlayer(p.name,p.pos,p.age,p.ovr,p.ht,p.wt,p.info,p.hintPot)});
     // Add cut players to free agent pool
     (n.draftCuts||[]).forEach(function(c){
       if(c.reason==="waived"){
@@ -3034,12 +3114,28 @@ function App(){
         teams.map(function(t,i){return h("option",{key:i,value:i,disabled:i===otherVal},t.name)}));
     }
 
-    function playerList(team,selected,toggle){
+    function doPlayerTradeSuggest(playerName,teamIdx){
+      var result=suggestTradeForPlayer(playerName,teamIdx,teams);
+      if(result){
+        blockbusterData=result;
+        setTrA(result.teamAIdx);
+        setTrB(result.teamBIdx);
+        var starIdx=-1;var pkgIdxs=[];
+        var tStar=teams[result.starTeamIdx];
+        var tPkg=teams[result.packageTeamIdx];
+        if(tStar)(tStar.players||[]).forEach(function(p,i){if(p.name===result.starPlayer.name) starIdx=i});
+        if(tPkg) result.package.forEach(function(tp){(tPkg.players||[]).forEach(function(p,i){if(p.name===tp.name) pkgIdxs.push(i)})});
+        if(result.starTeamIdx===result.teamAIdx){setTrPA([starIdx]);setTrPB(pkgIdxs)}
+        else{setTrPB([starIdx]);setTrPA(pkgIdxs)}
+      }
+    }
+
+    function playerList(team,selected,toggle,teamIdx){
       if(!team)return null;
       return (team.players||[]).map(function(p,i){
         var sel=selected.indexOf(i)>=0;
         return h("div",{key:p.name,onClick:function(){toggle(i)},style:{padding:"6px 10px",background:sel?"#1b3a25":"#0d1117",border:sel?"2px solid #3fb950":"1px solid #21262d",borderRadius:6,marginBottom:3,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12}},
-          h("span",{style:{color:"#e6edf3"}},p.name," ",p.pos),
+          h("span",{style:{color:"#e6edf3"}},h("span",{className:"plink",onClick:function(e){e.stopPropagation();doPlayerTradeSuggest(p.name,teamIdx)}},p.name)," ",p.pos),
           h("span",null,oB(p.ovr),h("span",{className:"salary",style:{marginLeft:6}},salStr(p.salary||0)))
         );
       });
@@ -3093,8 +3189,8 @@ function App(){
     return h("div",{className:"card fade-in"},
       h("h2",{style:{marginBottom:16,color:ACCENT}},"\uD83D\uDD04 Trade Machine"),
       h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},
-        h("div",null,teamSel(_trA,setTrA,_trB),h("div",{style:{marginTop:8}},playerList(tA,selPA,togglePA))),
-        h("div",null,teamSel(_trB,setTrB,_trA),h("div",{style:{marginTop:8}},playerList(tB,selPB,togglePB)))
+        h("div",null,teamSel(_trA,setTrA,_trB),h("div",{style:{marginTop:8}},playerList(tA,selPA,togglePA,_trA))),
+        h("div",null,teamSel(_trB,setTrB,_trA),h("div",{style:{marginTop:8}},playerList(tB,selPB,togglePB,_trB)))
       ),
       (selPA.length>0||selPB.length>0)?h("div",{style:{marginTop:16,padding:14,background:"#1c2128",borderRadius:10,border:"1px solid #30363d",textAlign:"center"}},
         h("div",{style:{fontSize:13,marginBottom:8}},
@@ -3356,6 +3452,77 @@ function App(){
           )
         ):h("div",{style:{marginTop:8,fontSize:14,color:ACCENT,fontWeight:600}},state.phase==="playoffs"?"PLAYOFFS"+(state.playoffs&&state.playoffs.round?" - "+state.playoffs.round.toUpperCase():""):state.phase==="draft"?"DRAFT":state.phase.toUpperCase())
       ),
+
+      // SEASON PROGRESS BAR WITH MARKERS + WIN PROBABILITY + BIGGEST GAME
+      state.phase==="season"?(function(){
+        var gp2=ft.wins+ft.losses;
+        var remaining=82-gp2;
+        var wpct=gp2>0?ft.wins/gp2:0.5;
+        var projWins=Math.round(wpct*82);
+        var projLosses=82-projWins;
+        // Playoff probability based on win pace
+        var playoffProb=projWins>=52?99:projWins>=48?90:projWins>=44?75:projWins>=40?55:projWins>=36?35:projWins>=32?15:5;
+        var barPct=Math.round((gp2/82)*100);
+        var asbPct=Math.round((41/82)*100);
+        // Biggest game today
+        var todayGames=(state.schedule||[]).filter(function(g){return g.day===state.currentDay&&!g.result});
+        var bigGame=null;
+        var bigScore=-1;
+        todayGames.forEach(function(g){
+          var htT=(state.teams||[])[g.home];
+          var atT=(state.teams||[])[g.away];
+          if(!htT||!atT) return;
+          var htWp=htT.wins/Math.max(htT.wins+htT.losses,1);
+          var atWp=atT.wins/Math.max(atT.wins+atT.losses,1);
+          var sc=htWp+atWp;
+          if(htWp>0.6&&atWp>0.6) sc+=2;
+          if(getConf(htT.name)===getConf(atT.name)) sc+=0.5;
+          if(sc>bigScore){bigScore=sc;bigGame={home:htT,away:atT}}
+        });
+        return h("div",{style:{display:"grid",gridTemplateColumns:bigGame?"1fr 1fr":"1fr",gap:12,marginBottom:16}},
+          h("div",{className:"card",style:{marginBottom:0,padding:16}},
+            h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},
+              h("div",{style:{fontSize:12,fontWeight:700,color:ACCENT}},"SEASON PROGRESS"),
+              h("div",{style:{fontSize:11,color:"#8b949e"}},gp2+"/82 games")
+            ),
+            h("div",{style:{position:"relative",height:16,borderRadius:8,overflow:"visible",background:"#21262d",marginBottom:12}},
+              h("div",{style:{height:"100%",borderRadius:8,width:barPct+"%",background:"linear-gradient(90deg,"+PRIMARY+",#FFD700)",transition:"width 0.3s"}}),
+              h("div",{style:{position:"absolute",left:asbPct+"%",top:-4,width:2,height:24,background:"#58a6ff"}}),
+              h("div",{style:{position:"absolute",left:(asbPct-3)+"%",top:20,fontSize:9,color:"#58a6ff",whiteSpace:"nowrap"}},"All-Star"),
+              h("div",{style:{position:"absolute",right:0,top:-4,width:2,height:24,background:"#3fb950"}}),
+              h("div",{style:{position:"absolute",right:0,top:20,fontSize:9,color:"#3fb950"}},"Playoffs")
+            ),
+            h("div",{style:{marginTop:20,display:"flex",gap:16,flexWrap:"wrap"}},
+              h("div",{style:{flex:1,background:"#0d1117",borderRadius:8,padding:10,textAlign:"center",border:"1px solid #21262d"}},
+                h("div",{style:{fontSize:10,color:"#8b949e",fontWeight:600}},"PROJECTED RECORD"),
+                h("div",{style:{fontSize:18,fontWeight:800,color:"#e6edf3",marginTop:4}},projWins+"-"+projLosses)
+              ),
+              h("div",{style:{flex:1,background:"#0d1117",borderRadius:8,padding:10,textAlign:"center",border:"1px solid #21262d"}},
+                h("div",{style:{fontSize:10,color:"#8b949e",fontWeight:600}},"PLAYOFF PROBABILITY"),
+                h("div",{style:{fontSize:18,fontWeight:800,color:playoffProb>=70?"#3fb950":playoffProb>=40?"#d29922":"#f85149",marginTop:4}},playoffProb+"%")
+              )
+            )
+          ),
+          bigGame?h("div",{className:"card",style:{marginBottom:0,padding:16}},
+            h("div",{style:{fontSize:12,fontWeight:700,color:"#f0883e",marginBottom:10}},"BIGGEST GAME TODAY"),
+            h("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:16}},
+              h("div",{style:{textAlign:"center"}},
+                h("div",{style:{fontSize:20}},teamEmoji(bigGame.home.name)),
+                h("div",{style:{fontSize:12,fontWeight:700,color:"#e6edf3"}},(bigGame.home.name||"").split(" ").pop()),
+                h("div",{style:{fontSize:11,color:"#8b949e"}},bigGame.home.wins+"-"+bigGame.home.losses)
+              ),
+              h("div",{style:{fontSize:16,fontWeight:800,color:"#f0883e"}},"VS"),
+              h("div",{style:{textAlign:"center"}},
+                h("div",{style:{fontSize:20}},teamEmoji(bigGame.away.name)),
+                h("div",{style:{fontSize:12,fontWeight:700,color:"#e6edf3"}},(bigGame.away.name||"").split(" ").pop()),
+                h("div",{style:{fontSize:11,color:"#8b949e"}},bigGame.away.wins+"-"+bigGame.away.losses)
+              )
+            ),
+            bigScore>=2.7?h("div",{style:{textAlign:"center",marginTop:8,fontSize:11,color:"#f0883e",fontWeight:600}},"MARQUEE MATCHUP - Top teams clash!"):
+            bigScore>=2.0?h("div",{style:{textAlign:"center",marginTop:8,fontSize:11,color:"#d29922"}},"Competitive matchup"):null
+          ):null
+        );
+      })():null,
 
       // B. URGENT ALERTS
       alerts.length>0?h("div",{className:"card",style:{marginBottom:16,padding:16}},
