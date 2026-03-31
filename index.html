@@ -2482,7 +2482,35 @@ function App(){
         hist.length>0?h("button",{style:{background:"#da3633",color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontWeight:600,fontSize:12,cursor:"pointer"},onClick:deleteHistory},"Reset All"):null
       ),
 
-      // Current Season section
+      // ═══ 1. SINGLE GAME RECORDS (at top — most exciting) ═══
+      (function(){
+        var rec=state.records||{};
+        var recLabels={pts:"\uD83C\uDFC0 Most Points",reb:"\uD83D\uDCAA Most Rebounds",ast:"\uD83C\uDFAF Most Assists",blk:"\uD83D\uDEAB Most Blocks",stl:"\uD83D\uDC40 Most Steals",tpm:"\uD83C\uDFAF Most 3-Pointers"};
+        var hasRec=false;for(var rk in recLabels){if(rec[rk])hasRec=true}
+        if(!hasRec)return null;
+        return h("div",{style:{marginBottom:24}},
+          h("h3",{style:{fontSize:18,color:"#FFD700",marginBottom:12}},"\uD83D\uDD25 ALL-TIME SINGLE GAME RECORDS"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
+            (function(){var items=[];for(var k in recLabels){if(rec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},recLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:24}},rec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},rec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},rec[k].team+" \u2022 "+(rec[k].season||"")+" Season")))}}return items})()
+          )
+        );
+      })(),
+
+      // ═══ 2. SEASON AVERAGE RECORDS ═══
+      (function(){
+        var srec=state.seasonRecords||{};
+        var srecLabels={ppg:"\uD83C\uDFC0 Highest PPG",rpg:"\uD83D\uDCAA Highest RPG",apg:"\uD83C\uDFAF Highest APG",bpg:"\uD83D\uDEAB Highest BPG",spg:"\uD83D\uDC40 Highest SPG"};
+        var hasSRec=false;for(var sk in srecLabels){if(srec[sk])hasSRec=true}
+        if(!hasSRec)return null;
+        return h("div",{style:{marginBottom:24}},
+          h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83C\uDFC6 ALL-TIME SEASON AVERAGE RECORDS"),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
+            (function(){var items=[];for(var k in srecLabels){if(srec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},srecLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:20}},srec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},srec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},srec[k].team+" \u2022 "+(srec[k].season||"")+" Season")))}}return items})()
+          )
+        );
+      })(),
+
+      // ═══ 3. CURRENT SEASON ═══
       h("div",{style:{marginBottom:20,padding:16,background:"linear-gradient(135deg,#161b22,#1c2128)",borderRadius:12,border:"1px solid #30363d"}},
         h("h3",{style:{fontSize:14,color:ACCENT,marginBottom:8}},"\uD83C\uDFC0 Current Season - "+(state.seasonNum||2026)+" ("+state.phase.toUpperCase()+")"),
         h("div",{style:{fontSize:12,color:"#8b949e",marginBottom:10}},"Games: "+_curPlayed+" / "+_curTotal+" played"),
@@ -2507,33 +2535,7 @@ function App(){
         )
       ),
 
-      // All-Time Single Game Records
-      (function(){
-        var rec=state.records||{};
-        var srec=state.seasonRecords||{};
-        var recLabels={pts:"\uD83C\uDFC0 Most Points",reb:"\uD83D\uDCAA Most Rebounds",ast:"\uD83C\uDFAF Most Assists",blk:"\uD83D\uDEAB Most Blocks",stl:"\uD83D\uDC40 Most Steals",tpm:"\uD83C\uDFAF Most 3-Pointers"};
-        var srecLabels={ppg:"\uD83C\uDFC0 Highest PPG",rpg:"\uD83D\uDCAA Highest RPG",apg:"\uD83C\uDFAF Highest APG",bpg:"\uD83D\uDEAB Highest BPG",spg:"\uD83D\uDC40 Highest SPG"};
-        var hasRec=false;var hasSRec=false;
-        for(var rk in recLabels){if(rec[rk])hasRec=true}
-        for(var sk in srecLabels){if(srec[sk])hasSRec=true}
-        if(!hasRec&&!hasSRec)return null;
-        return h("div",{style:{marginBottom:24}},
-          hasRec?h("div",{style:{marginBottom:16}},
-            h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83D\uDD25 All-Time Single Game Records"),
-            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
-              (function(){var items=[];for(var k in recLabels){if(rec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},recLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:20}},rec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},rec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},rec[k].team+" \u2022 "+(rec[k].season||"")+" Season")))}}return items})()
-            )
-          ):null,
-          hasSRec?h("div",null,
-            h("h3",{style:{fontSize:16,color:"#FFD700",marginBottom:12}},"\uD83C\uDFC6 All-Time Season Average Records"),
-            h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},
-              (function(){var items=[];for(var k in srecLabels){if(srec[k]){items.push(h("div",{key:k,style:{padding:"14px 16px",background:"linear-gradient(135deg,#2d1f00,#1c2128)",borderRadius:10,border:"2px solid #FFD700",boxShadow:"0 2px 8px rgba(255,215,0,0.15)"}},h("div",{style:{color:"#FFD700",fontWeight:700,fontSize:12,marginBottom:4}},srecLabels[k]),h("div",{style:{color:"#e6edf3",fontWeight:800,fontSize:20}},srec[k].value),h("div",{style:{color:"#e6edf3",fontWeight:600,fontSize:13,marginTop:2}},srec[k].name),h("div",{style:{color:"#8b949e",fontSize:11,marginTop:2}},srec[k].team+" \u2022 "+(srec[k].season||"")+" Season")))}}return items})()
-            )
-          ):null
-        );
-      })(),
-
-      // Championship Counts
+      // ═══ 4. CHAMPIONSHIP COUNTS ═══
       Object.keys(state.champCounts||{}).length>0?h("div",{style:{marginBottom:20}},
         h("h3",{style:{fontSize:14,color:"#FFD700",marginBottom:8}},"\uD83C\uDFC6 Championship Counts"),
         Object.keys(state.champCounts||{}).sort(function(a,b){return(state.champCounts||{})[b]-(state.champCounts||{})[a]}).map(function(name,i){
@@ -3377,33 +3379,6 @@ function App(){
         summary.map(function(line, i) {
           return h("div", {key: i, style: {padding: "8px 12px", marginBottom: 6, background: i === 0 ? "rgba(255,215,0,0.08)" : "transparent", borderRadius: 8, fontSize: 13, color: i === 0 ? "#FFD700" : "#e6edf3", lineHeight: "1.5", borderLeft: i === 0 ? "3px solid #FFD700" : "none"}}, line);
         })
-      ),
-      h("div", {className: "card", style: {marginBottom: 20}},
-        h("h3", {style: {color: ACCENT, marginBottom: 12}}, "BIG BOARD - Top 30"),
-        h("div", {style: {overflowX: "auto"}},
-          h("table", null,
-            tHead(["Rank", "Player", "Team", "POS", "Age", "OVR", "POT", "Score", "PPG"]),
-            h("tbody", null,
-              bigBoard.map(function(entry, i) {
-                var p = entry.player;
-                var gp = p.stats ? p.stats.gp : 0;
-                var ppg = gp > 0 ? (p.stats.pts / gp).toFixed(1) : "-";
-                var borderColor = i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "transparent";
-                return h("tr", {key: p.name, style: {borderLeft: "3px solid " + borderColor}},
-                  h("td", {style: {fontWeight: 800, color: i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "#e6edf3"}}, i + 1),
-                  h("td", null, h("span", {style: {display: "inline-flex", alignItems: "center", gap: 6}}, avatar(p.name, entry.teamColor, 28), h("span", {className: "plink", onClick: function() { setModal({type: "player", data: p}); }}, p.name))),
-                  h("td", null, h("span", {style: {display: "flex", alignItems: "center", gap: 4}}, dot(entry.teamColor), h("span", {style: {fontSize: 11}}, entry.team))),
-                  h("td", null, p.pos),
-                  h("td", null, p.age),
-                  h("td", null, oB(p.ovr)),
-                  h("td", null, oB(p.potential || p.ovr)),
-                  h("td", {style: {fontWeight: 700, color: i < 5 ? "#FFD700" : i < 15 ? "#C0C0C0" : "#3fb950"}}, entry.score),
-                  h("td", null, ppg)
-                );
-              })
-            )
-          )
-        )
       ),
       h("div", {className: "card"},
         h("h3", {style: {color: ACCENT, marginBottom: 12}}, "MOCK DRAFT - 30 Picks"),
