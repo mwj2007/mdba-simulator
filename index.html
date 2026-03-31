@@ -364,15 +364,16 @@ function simGame(ht,at,hl){
   hO=hO+((ht.chemistry||75)-75)*0.05;
   aO=aO+((at.chemistry||75)-75)*0.05;
   var diff=(hO-aO)*0.18,pace=RF(104,116),hadv=RF(2,4);
-  var hT=Math.round(clamp(pace+diff+hadv+G(0,9),92,135)),aT=Math.round(clamp(pace-diff-hadv+G(0,9),92,135));
+  var hT=Math.round(clamp(pace+diff+hadv+G(0,9),92,145)),aT=Math.round(clamp(pace-diff-hadv+G(0,9),92,145));
   function simT(pl,tgt){
     var st=[],tot=0;
     pl.forEach(function(p,i){
       var b=PB[p.pos]||PB.SF;
       var min=i<5?RF(30,38):i<7?RF(16,26):i<8?RF(10,18):i<10?RF(0,8):RF(0,4);
       var ms=min/36,f=RF(0.6,1.4);
-      if(p.ovr>=90 && Math.random()<0.02) f = RF(1.6, 2.2);
-      else if(p.ovr>=85 && Math.random()<0.01) f = RF(1.5, 1.9);
+      if(p.ovr>=92 && Math.random()<0.05) f = RF(2.2, 3.2);
+      else if(p.ovr>=88 && Math.random()<0.03) f = RF(1.8, 2.6);
+      else if(p.ovr>=85 && Math.random()<0.02) f = RF(1.5, 2.0);
       var pw=Math.pow(p.ovr/78,2.2)*f;
       // FIXED: star multiplier capped lower for blocks/steals
       var star=p.ovr>=92?1.8:p.ovr>=87?1.5:p.ovr>=82?1.25:p.ovr>=77?1.1:1.0;
@@ -400,11 +401,37 @@ function simGame(ht,at,hl){
       st.push({name:p.name,pos:p.pos,ovr:p.ovr,ht:p.ht,wt:p.wt,min:Math.round(min),pts:pts,reb:reb,oreb:oreb,dreb:reb-oreb,ast:ast,stl:stl,blk:blk,to:Math.round(clamp(RF(0.3,3.5)*ms,0,8)),pf:Math.round(clamp(RF(0.8,4.5)*ms,0,6)),fgm:fgm,fga:fga,tpm:tpm,tpa:tpa,ftm:ftm,fta:fta,ri:i});
     });
     if(tot>0&&tot!==tgt){
-      var tO=st.reduce(function(s,p){return s+p.ovr},0),d=tgt-tot;
-      st.forEach(function(p){p.pts+=Math.round(d*(p.ovr/tO))});
-      var rem=tgt-st.reduce(function(s,p){return s+p.pts},0);
-      if(rem)(st.reduce(function(b,p){return p.ovr>b.ovr?p:b},st[0])).pts+=rem;
-      st.forEach(function(p){if(p.pts<0)p.pts=0});
+      // Find the top scorer - protect them from reduction during explosion games
+      var topIdx=0;
+      for(var ti=1;ti<st.length;ti++){if(st[ti].pts>st[topIdx].pts)topIdx=ti}
+      var topPts=st[topIdx].pts;
+      var d=tgt-tot;
+      if(d<0&&topPts>=45){
+        // Team scored too much and top scorer had a big game - only reduce others
+        var othTot=tot-topPts;
+        var othTarget=tgt-topPts;
+        if(othTarget>0&&othTot>0){
+          var ratio=othTarget/othTot;
+          st.forEach(function(p2,pi){if(pi!==topIdx){p2.pts=Math.max(0,Math.round(p2.pts*ratio))}});
+        }
+        // Adjust remainder
+        var newTot=st.reduce(function(s2,p2){return s2+p2.pts},0);
+        var rem2=tgt-newTot;
+        if(rem2>0)st[topIdx].pts+=rem2;
+        else if(rem2<0){
+          // Reduce others more
+          for(var ri=0;ri<st.length&&rem2<0;ri++){
+            if(ri!==topIdx&&st[ri].pts>0){var cut=Math.min(st[ri].pts,Math.abs(rem2));st[ri].pts-=cut;rem2+=cut}
+          }
+        }
+      } else {
+        // Normal normalization
+        var tO=st.reduce(function(s2,p2){return s2+p2.ovr},0);
+        st.forEach(function(p2){p2.pts+=Math.round(d*(p2.ovr/tO))});
+        var rem3=tgt-st.reduce(function(s2,p2){return s2+p2.pts},0);
+        if(rem3)(st.reduce(function(b2,p2){return p2.ovr>b2.ovr?p2:b2},st[0])).pts+=rem3;
+      }
+      st.forEach(function(p2){if(p2.pts<0)p2.pts=0});
     }
     return st;
   }
@@ -2079,15 +2106,13 @@ function App(){
 
   // Leaders
   function vLeaders(){
-    var cats=[{k:"pts",l:"Scoring"},{k:"reb",l:"Rebounds"},{k:"ast",l:"Assists"},{k:"stl",l:"Steals"},{k:"blk",l:"Blocks"},{k:"tpp",l:"3P%"},{k:"dunk",l:"Dunking"},{k:"passing",l:"Passing"},{k:"fgp",l:"FG%"},{k:"ftp",l:"FT%"}];
+    var cats=[{k:"pts",l:"Scoring"},{k:"reb",l:"Rebounds"},{k:"ast",l:"Assists"},{k:"stl",l:"Steals"},{k:"blk",l:"Blocks"},{k:"fgp",l:"FG%"},{k:"tpp",l:"3P%"},{k:"ftp",l:"FT%"}];
     var all=[];
     (state.teams||[]).forEach(function(t){(t.players||[]).forEach(function(p){if(p.stats.gp>=1)all.push(Object.assign({},p,{teamName:t.name,teamColor:COLORS2[t.name]}))})});
     var sorted;
     if(lCat==="tpp"){sorted=all.filter(function(p){return p.stats.tpa>=10}).sort(function(a,b){return(b.stats.tpm/b.stats.tpa)-(a.stats.tpm/a.stats.tpa)}).slice(0,20)}
     else if(lCat==="fgp"){sorted=all.filter(function(p){return p.stats.fga>=20}).sort(function(a,b){return(b.stats.fgm/b.stats.fga)-(a.stats.fgm/a.stats.fga)}).slice(0,20)}
     else if(lCat==="ftp"){sorted=all.filter(function(p){return p.stats.fta>=10}).sort(function(a,b){return(b.stats.ftm/b.stats.fta)-(a.stats.ftm/a.stats.fta)}).slice(0,20)}
-    else if(lCat==="dunk"){sorted=all.filter(function(p){return p.pos==="PF"||p.pos==="SF"||p.pos==="C"}).sort(function(a,b){return b.ovr-a.ovr}).slice(0,20)}
-    else if(lCat==="passing"){sorted=all.slice().sort(function(a,b){return(b.stats.ast/b.stats.gp)-(a.stats.ast/a.stats.gp)}).slice(0,20)}
     else{sorted=all.slice().sort(function(a,b){return(b.stats[lCat]/b.stats.gp)-(a.stats[lCat]/a.stats.gp)}).slice(0,20)}
     return h("div",{className:"card fade-in"},
       h("h2",{style:{marginBottom:12,color:ACCENT}},"Leaders"),
@@ -2101,7 +2126,7 @@ function App(){
             h("td",{style:{padding:"8px 6px"}},oB(p.ovr)),
             h("td",{style:{padding:"8px 6px",color:"#8b949e"}},p.pos),
             h("td",{style:{padding:"8px 6px",color:"#8b949e"}},p.stats.gp),
-            h("td",{style:{padding:"8px 6px",fontWeight:700,fontSize:14,color:i<3?"#FFD700":"#e6edf3"}},lCat==="tpp"?pct(p.stats.tpm,p.stats.tpa)+"%":lCat==="fgp"?pct(p.stats.fgm,p.stats.fga)+"%":lCat==="ftp"?pct(p.stats.ftm,p.stats.fta)+"%":lCat==="dunk"?p.ovr:lCat==="passing"?avg(p.stats.ast,p.stats.gp):avg(p.stats[lCat],p.stats.gp))
+            h("td",{style:{padding:"8px 6px",fontWeight:700,fontSize:14,color:i<3?"#FFD700":"#e6edf3"}},lCat==="tpp"?pct(p.stats.tpm,p.stats.tpa)+"%":lCat==="fgp"?pct(p.stats.fgm,p.stats.fga)+"%":lCat==="ftp"?pct(p.stats.ftm,p.stats.fta)+"%":avg(p.stats[lCat],p.stats.gp))
           );
         })
       )))
